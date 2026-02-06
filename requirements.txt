@@ -1,0 +1,70 @@
+# Speaker Separation & Vocal Isolation - Complete Requirements (Python 3.11+)
+# Install with: pip install -r requirements-complete.txt
+# Optimized for Python 3.11.9 compatibility
+
+# ============================================================================
+# Environment Configuration
+# ============================================================================
+python-dotenv>=1.0.0     # .env file support
+huggingface-hub>=0.21.0  # HuggingFace authentication (Python 3.11+)
+
+# ============================================================================
+# Core Audio Processing (Python 3.11+ compatible)
+# ============================================================================
+librosa>=0.10.1          # Audio analysis and feature extraction
+soundfile>=0.12.1        # Audio file I/O (Python 3.11+)
+numpy>=1.26.0            # Numerical computing (Python 3.11+ requires 1.26+)
+scipy>=1.11.4            # Scientific computing, signal processing (Python 3.11+)
+
+# ============================================================================
+# Machine Learning & Clustering
+# ============================================================================
+scikit-learn>=1.3.2      # Clustering algorithms (KMeans, GMM, Spectral)
+
+# ============================================================================
+# Vocal Separation Tools (Updated for Python 3.11)
+# ============================================================================
+# demucs>=4.0.1 - High-quality audio source separation (Python 3.11 compatible)
+demucs>=4.0.1            # High-quality vocal separation (Python 3.11+)
+# Note: spleeter still has TensorFlow compatibility issues with Python 3.11
+noisereduce>=2.0.0       # Advanced noise reduction (Python 3.11+)
+
+# ============================================================================
+# API Backend (if using the REST API)
+# ============================================================================
+fastapi>=0.104.0         # Web framework
+uvicorn[standard]>=0.24.0  # ASGI server (Python 3.11+)
+python-multipart>=0.0.6  # File upload support
+aiofiles>=23.2.1         # Async file operations (Python 3.11+)
+requests>=2.31.0         # HTTP client for Ollama
+jinja2>=3.1.2            # Jinja templates for frontend UI
+
+# ============================================================================
+# Audio Format Support
+# ============================================================================
+pydub>=0.25.1            # Audio format conversion (Python 3.11+)
+ffmpeg-python>=0.2.0  # OPTIONAL: FFmpeg wrapper (requires ffmpeg system package)
+
+# ============================================================================
+# Visualization (Optional but recommended)
+# ============================================================================
+matplotlib>=3.8.0        # Plotting and diagnostics (Python 3.11+)
+
+# ============================================================================
+# Advanced Features (Optional - for specific use cases)
+# ============================================================================
+# PyTorch ecosystem alternatives (if needed for advanced models)
+torch>=2.1.0           # PyTorch (optional, for advanced ML models)
+torchaudio>=2.1.0      # Audio support for PyTorch (optional)
+# 
+# Note: pyannote.audio NOT included
+# - Requires HuggingFace authentication token
+# - Uses heavy dependencies not needed for basic speaker separation
+# - Built-in spectral clustering provides sufficient functionality
+
+# ============================================================================
+# Development Tools (Optional)
+# ============================================================================
+# pytest>=7.4.3          # Testing (Python 3.11+)
+# black>=23.12.0         # Code formatting (Python 3.11+)
+# flake8>=6.1.0          # Linting (Python 3.11+)

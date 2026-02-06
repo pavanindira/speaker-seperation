@@ -1,0 +1,31 @@
+version: '3.8'
+
+services:
+  speaker-separator:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: speaker-separator-api
+    ports:
+      - "8000:8000"
+    volumes:
+      - ./conversation_output:/app/conversation_output
+      - ./uploads:/app/uploads
+      - ./outputs:/app/outputs
+      - ./data:/app/data
+      - ./data/test.mpeg:/app/data/test.mpeg:ro
+      - ./data/DIALOGUE.ogg:/app/data/DIALOGUE.ogg:ro
+      # UI + app code (so you don't need rebuilds for template/JS changes)
+      - ./templates:/app/templates:ro
+      - ./static:/app/static:ro
+      - ./final_speaker_api.py:/app/final_speaker_api.py:ro
+    environment:
+      - OLLAMA_URL=${OLLAMA_URL:-http://192.168.1.33:11434}
+      - API_PORT=8000
+    networks:
+      - vocal-network
+    command: python final_speaker_api.py --host 0.0.0.0 --port 8000 --reload
+
+networks:
+  vocal-network:
+    driver: bridge

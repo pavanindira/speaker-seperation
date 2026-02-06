@@ -1,0 +1,69 @@
+# Speaker Separation & Vocal Isolation - Complete Requirements
+# Install with: pip install -r requirements-complete.txt
+
+# ============================================================================
+# Environment Configuration
+# ============================================================================
+python-dotenv>=1.0.0     # .env file support
+huggingface-hub>=0.19.0  # HuggingFace authentication
+
+# ============================================================================
+# Core Audio Processing
+# ============================================================================
+librosa>=0.10.0          # Audio analysis and feature extraction
+soundfile>=0.12.0        # Audio file I/O
+numpy>=1.24.0            # Numerical computing
+scipy>=1.10.0            # Scientific computing, signal processing
+
+# ============================================================================
+# Machine Learning & Clustering
+# ============================================================================
+scikit-learn>=1.3.0      # Clustering algorithms (KMeans, GMM, Spectral)
+
+# ============================================================================
+# Vocal Separation Tools (Choose one or both)
+# ============================================================================
+spleeter>=2.3.0          # Fast vocal separation
+demucs>=4.0.0            # High-quality vocal separation
+
+# ============================================================================
+# API Backend (if using the REST API)
+# ============================================================================
+fastapi>=0.104.0         # Web framework
+uvicorn[standard]>=0.24.0  # ASGI server
+python-multipart>=0.0.6  # File upload support
+aiofiles>=23.2.0         # Async file operations
+requests>=2.31.0         # HTTP client for Ollama
+
+# ============================================================================
+# Audio Format Support
+# ============================================================================
+pydub>=0.25.0            # Audio format conversion
+ffmpeg-python>=0.2.0     # FFmpeg wrapper (requires ffmpeg installed)
+
+# ============================================================================
+# Audio Enhancement (Optional but recommended)
+# ============================================================================
+noisereduce>=2.0.0       # Advanced noise reduction
+
+# ============================================================================
+# Visualization (Optional but recommended)
+# ============================================================================
+matplotlib>=3.7.0        # Plotting and diagnostics
+
+# ============================================================================
+# Advanced Speaker Diarization (Optional - for best quality)
+# ============================================================================
+# pyannote.audio>=3.1.0  # State-of-the-art speaker diarization
+# torch>=2.0.0           # Required for pyannote
+# torchaudio>=2.0.0      # Required for pyannote
+
+# Note: pyannote.audio requires HuggingFace account and token
+# See: https://huggingface.co/pyannote/speaker-diarization
+
+# ============================================================================
+# Development Tools (Optional)
+# ============================================================================
+# pytest>=7.4.0          # Testing
+# black>=23.0.0          # Code formatting
+# flake8>=6.0.0          # Linting

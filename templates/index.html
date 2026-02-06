@@ -1,0 +1,28 @@
+{% extends "base.html" %}
+
+{% block title %}Upload Audio | Speaker Separation{% endblock %}
+
+{% block content %}
+  <section class="hero">
+    <h1>Speaker Separation</h1>
+    <p class="subtle">
+      Upload an audio file. Then run diagnosis, separation, and optional cleaning from the job page.
+    </p>
+  </section>
+
+  <section class="card">
+    <h2>Upload</h2>
+    <form class="form" action="/ui/upload" method="post" enctype="multipart/form-data">
+      <label class="label" for="file">Audio file</label>
+      <input class="input" id="file" name="file" type="file" accept=".mp3,.wav,.flac,.ogg,.m4a,audio/*" required />
+
+      <div class="actions">
+        <button class="button" type="submit">Upload & continue</button>
+        <a class="button secondary" href="/docs" target="_blank" rel="noopener">Open API docs</a>
+      </div>
+
+      <p class="hint">Supported: mp3, wav, flac, ogg, m4a. Max size is enforced server-side.</p>
+    </form>
+  </section>
+{% endblock %}
+

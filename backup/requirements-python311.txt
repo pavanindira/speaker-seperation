@@ -1,0 +1,55 @@
+# Speaker Separation - Python 3.11 Compatible Requirements
+# Install with: pip install -r requirements-python311.txt
+# This file is optimized for Python 3.11.9 compatibility
+
+# ============================================================================
+# Core Audio Processing (Python 3.11 compatible)
+# ============================================================================
+librosa>=0.10.1          # Audio analysis and feature extraction
+soundfile>=0.12.1        # Audio file I/O
+numpy>=1.26.0            # Numerical computing (Python 3.11+)
+scipy>=1.11.0            # Scientific computing, signal processing
+
+# ============================================================================
+# Machine Learning & Clustering
+# ============================================================================
+scikit-learn>=1.3.0      # Clustering algorithms (KMeans, GMM, Spectral)
+
+# ============================================================================
+# API Backend (if using the REST API)
+# ============================================================================
+fastapi>=0.104.0         # Web framework
+uvicorn[standard]>=0.24.0  # ASGI server
+python-multipart>=0.0.6  # File upload support
+aiofiles>=23.2.0         # Async file operations
+requests>=2.31.0         # HTTP client for Ollama
+
+# ============================================================================
+# Audio Format Support
+# ============================================================================
+pydub>=0.25.0            # Audio format conversion
+# Note: ffmpeg must be installed separately on your system
+
+# ============================================================================
+# Environment Configuration (Optional)
+# ============================================================================
+python-dotenv>=1.0.0     # .env file support
+
+# ============================================================================
+# Visualization (Optional)
+# ============================================================================
+matplotlib>=3.8.0        # Plotting and diagnostics
+
+# ============================================================================
+# Notes on excluded packages:
+# ============================================================================
+# EXCLUDED: spleeter - requires TensorFlow 2.12.1 (incompatible with Python 3.11)
+# EXCLUDED: demucs - has dependencies incompatible with Python 3.11
+# EXCLUDED: pyannote.audio - requires HuggingFace token and has compatibility issues
+# 
+# These were part of the "complete" setup but are not essential since the
+# core speaker separation algorithms in speaker_separator.py are fully functional.
+# 
+# If you need more advanced features, use Docker instead:
+#   docker compose up -d
+# The Docker container handles all dependencies automatically.

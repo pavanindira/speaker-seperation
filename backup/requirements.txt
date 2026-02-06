@@ -1,0 +1,7 @@
+librosa 
+soundfile 
+numpy 
+scipy 
+scikit-learn
+pydub
+pyannote.audio

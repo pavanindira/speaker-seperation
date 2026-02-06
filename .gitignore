@@ -1,0 +1,38 @@
+# --- OS / Editor ---
+.DS_Store
+.idea/
+.vscode/
+
+# --- Python ---
+__pycache__/
+*.py[cod]
+*$py.class
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.coverage
+coverage.xml
+htmlcov/
+.tox/
+
+# --- Virtualenvs ---
+.venv/
+venv/
+env/
+.envrc
+
+# --- Environment variables / secrets ---
+.env
+.env.*
+!.env.example
+!.env.template
+
+# --- Project outputs ---
+separated_speakers/
+uploads/
+outputs/
+temp/
+conversation_output/
+
+# --- Logs ---
+*.log
