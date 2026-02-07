@@ -24,5 +24,28 @@
       <p class="hint">Supported: mp3, wav, flac, ogg, m4a. Max size is enforced server-side.</p>
     </form>
   </section>
+
+  <section class="card">
+    <h2>Recent jobs</h2>
+    {% if recent_jobs and recent_jobs|length > 0 %}
+      <div class="jobList">
+        {% for j in recent_jobs %}
+          <a class="jobItem" href="/ui/jobs/{{ j.job_id }}">
+            <div class="jobMain">
+              <div class="jobTitle">{{ j.filename }}</div>
+              <div class="jobSubtle mono">{{ j.job_id }}</div>
+            </div>
+            <div class="jobMeta">
+              <span class="pill">{{ j.status }}</span>
+              <span class="jobTime mono">{{ j.created_at }}</span>
+            </div>
+          </a>
+        {% endfor %}
+      </div>
+      <p class="hint">Jobs are stored in memory and reset when the server restarts.</p>
+    {% else %}
+      <p class="subtle">No jobs yet. Upload an audio file to get started.</p>
+    {% endif %}
+  </section>
 {% endblock %}
 

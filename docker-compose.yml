@@ -7,7 +7,7 @@ services:
       dockerfile: Dockerfile
     container_name: speaker-separator-api
     ports:
-      - "8000:8000"
+      - "8900:8900"
     volumes:
       - ./conversation_output:/app/conversation_output
       - ./uploads:/app/uploads
@@ -21,10 +21,10 @@ services:
       - ./final_speaker_api.py:/app/final_speaker_api.py:ro
     environment:
       - OLLAMA_URL=${OLLAMA_URL:-http://192.168.1.33:11434}
-      - API_PORT=8000
+      - API_PORT=8900
     networks:
       - vocal-network
-    command: python final_speaker_api.py --host 0.0.0.0 --port 8000 --reload
+    command: python final_speaker_api.py --host 0.0.0.0 --port 8900 --reload
 
 networks:
   vocal-network:

@@ -25,14 +25,14 @@ export OLLAMA_URL=http://192.168.1.33:11434
 # Start the API service
 docker compose up -d
 
-# API will be available at http://localhost:8000
+# API will be available at http://localhost:8900
 ```
 
 ### Access API Documentation
 
-- **Swagger UI**: http://localhost:8000/docs
-- **ReDoc**: http://localhost:8000/redoc
-- **OpenAPI JSON**: http://localhost:8000/openapi.json
+- **Swagger UI**: http://localhost:8900/docs
+- **ReDoc**: http://localhost:8900/redoc
+- **OpenAPI JSON**: http://localhost:8900/openapi.json
 
 ## API Endpoints
 
@@ -71,7 +71,7 @@ POST /api/v1/separate
 
 **Example:**
 ```bash
-curl -X POST http://localhost:8000/api/v1/separate \
+curl -X POST http://localhost:8900/api/v1/separate \
   -F "file=@conversation.mp3" \
   -F "num_speakers=2" \
   -F "method=auto" \
@@ -100,7 +100,7 @@ GET /api/v1/status/{job_id}
 
 **Example:**
 ```bash
-curl http://localhost:8000/api/v1/status/f594cdba-f2a6-40a7-9f82-ed9570cf2794
+curl http://localhost:8900/api/v1/status/f594cdba-f2a6-40a7-9f82-ed9570cf2794
 ```
 
 **Response:**
@@ -133,7 +133,7 @@ Returns complete job results including separated speaker files and Ollama analys
 
 **Example:**
 ```bash
-curl http://localhost:8000/api/v1/results/f594cdba-f2a6-40a7-9f82-ed9570cf2794
+curl http://localhost:8900/api/v1/results/f594cdba-f2a6-40a7-9f82-ed9570cf2794
 ```
 
 **Response:**
@@ -172,7 +172,7 @@ Download the separated audio file for a specific speaker.
 
 **Example:**
 ```bash
-curl -o speaker_1.wav http://localhost:8000/api/v1/download/f594cdba-f2a6-40a7-9f82-ed9570cf2794/speaker_1
+curl -o speaker_1.wav http://localhost:8900/api/v1/download/f594cdba-f2a6-40a7-9f82-ed9570cf2794/speaker_1
 ```
 
 ### 6. List All Jobs
@@ -185,7 +185,7 @@ Returns a list of all jobs with their current status.
 
 **Example:**
 ```bash
-curl http://localhost:8000/api/v1/jobs
+curl http://localhost:8900/api/v1/jobs
 ```
 
 **Response:**
@@ -212,7 +212,7 @@ import requests
 import time
 
 # API endpoint
-api_url = "http://localhost:8000"
+api_url = "http://localhost:8900"
 
 # 1. Submit separation job
 with open("conversation.mp3", "rb") as f:
@@ -276,7 +276,7 @@ const fetch = require('node-fetch');
 const fs = require('fs');
 const FormData = require('form-data');
 
-const apiUrl = "http://localhost:8000";
+const apiUrl = "http://localhost:8900";
 
 async function separateSpeakers(audioFilePath, numSpeakers = 2) {
   // 1. Submit job
@@ -343,7 +343,7 @@ separateSpeakers('conversation.mp3', 2);
 export OLLAMA_URL=http://192.168.1.33:11434
 
 # API port
-export API_PORT=8000
+export API_PORT=8900
 
 # Optional: Ollama model (default: llama3.2)
 export OLLAMA_MODEL=llama3.2
@@ -536,7 +536,7 @@ df -h
 import requests
 import glob
 
-api_url = "http://localhost:8000"
+api_url = "http://localhost:8900"
 
 # Submit multiple jobs
 job_ids = []

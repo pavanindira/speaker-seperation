@@ -29,6 +29,20 @@ body {
   margin: 0 auto;
 }
 
+.narrow {
+  width: min(760px, 100%);
+  margin-left: auto;
+  margin-right: auto;
+}
+
+.centerLayout { text-align: center; }
+.centerLayout .actions { justify-content: center; }
+.centerLayout .progressWrap { text-align: left; }
+.centerLayout .stepper { text-align: left; }
+.centerLayout .audioPreview { text-align: left; }
+.centerLayout .summaryCard { text-align: left; }
+.leftLayout { text-align: left; }
+
 .topbar {
   position: sticky;
   top: 0;
@@ -228,6 +242,155 @@ h2 { margin: 0 0 12px; font-size: 18px; color: rgba(255,255,255,0.92); }
 }
 
 .wizardSection { margin-top: 10px; }
+
+.stepperCompact .step .desc { display: none; }
+@media (min-width: 920px) {
+  .stepperCompact .step .desc { display: block; }
+}
+
+.audioPreview {
+  margin-top: 12px;
+  padding: 12px;
+  border-radius: 14px;
+  border: 1px solid rgba(255,255,255,0.10);
+  background: rgba(255,255,255,0.04);
+}
+.audioPreview audio { width: 100%; margin-top: 8px; }
+
+.progressWrap {
+  margin-top: 12px;
+}
+.progressBar {
+  height: 10px;
+  border-radius: 999px;
+  border: 1px solid rgba(255,255,255,0.14);
+  background: rgba(255,255,255,0.06);
+  overflow: hidden;
+}
+.progressFill {
+  height: 100%;
+  width: 0%;
+  border-radius: 999px;
+  background: linear-gradient(90deg, rgba(124, 92, 255, 0.95), rgba(79, 209, 197, 0.85));
+  transition: width 220ms ease;
+}
+.progressText {
+  margin-top: 8px;
+  color: rgba(255,255,255,0.75);
+  font-size: 13px;
+}
+
+.summaryCard {
+  margin-top: 12px;
+  padding: 12px;
+  border-radius: 14px;
+  border: 1px solid rgba(255,255,255,0.10);
+  background: rgba(255,255,255,0.04);
+}
+.summaryGrid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+}
+@media (min-width: 720px) {
+  .summaryGrid {
+    grid-template-columns: repeat(4, 1fr);
+  }
+}
+.summaryValue {
+  font-weight: 900;
+  font-size: 16px;
+  margin-top: 2px;
+}
+.summaryLists {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 10px;
+  margin-top: 12px;
+}
+@media (min-width: 720px) {
+  .summaryLists { grid-template-columns: 1fr 1fr; }
+}
+.list {
+  margin: 8px 0 0;
+  padding-left: 18px;
+  color: rgba(255,255,255,0.72);
+  font-size: 13px;
+}
+
+.details {
+  margin-top: 12px;
+  border-radius: 14px;
+  border: 1px solid rgba(255,255,255,0.10);
+  background: rgba(255,255,255,0.03);
+  padding: 10px 12px;
+}
+.detailsSummary {
+  cursor: pointer;
+  font-weight: 700;
+  color: rgba(255,255,255,0.86);
+}
+.detailsBody { padding-top: 10px; }
+
+.summaryLine {
+  margin-top: 8px;
+  margin-bottom: 10px;
+  color: rgba(255,255,255,0.75);
+  font-size: 13px;
+}
+
+.resultBlock { margin-top: 12px; }
+.resultTitle { font-weight: 800; margin-bottom: 10px; }
+.fileRow {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 10px;
+  padding: 12px;
+  border-radius: 14px;
+  border: 1px solid rgba(255,255,255,0.10);
+  background: rgba(255,255,255,0.04);
+  margin-bottom: 10px;
+}
+@media (min-width: 720px) {
+  .fileRow {
+    grid-template-columns: 220px 1fr 110px;
+    align-items: center;
+  }
+}
+.fileName { font-weight: 800; }
+.fileSubtle { color: rgba(255,255,255,0.62); font-size: 12px; margin-top: 2px; }
+.fileAudio { width: 100%; }
+.fileDownload {
+  text-align: center;
+  padding: 10px 12px;
+  border-radius: 12px;
+  border: 1px solid rgba(255,255,255,0.16);
+  background: rgba(255,255,255,0.08);
+  color: var(--text);
+  text-decoration: none;
+  font-weight: 700;
+}
+.fileDownload:hover { filter: brightness(1.04); }
+
+/* Recent jobs list */
+.jobList { display: grid; gap: 10px; margin-top: 10px; }
+.jobItem {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 12px;
+  border-radius: 14px;
+  border: 1px solid rgba(255,255,255,0.10);
+  background: rgba(255,255,255,0.04);
+  text-decoration: none;
+  color: var(--text);
+}
+.jobItem:hover { filter: brightness(1.05); }
+.jobTitle { font-weight: 900; }
+.jobSubtle { margin-top: 2px; color: rgba(255,255,255,0.62); font-size: 12px; }
+.jobMeta { display: grid; justify-items: end; gap: 6px; }
+.jobTime { color: rgba(255,255,255,0.55); font-size: 12px; }
 
 /* Full-page loader */
 .loaderOverlay {

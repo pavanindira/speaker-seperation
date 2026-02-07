@@ -47,14 +47,14 @@ export OLLAMA_URL=http://192.168.1.33:11434
 # Start Docker service
 docker compose up -d
 
-# API available at http://localhost:8000
+# API available at http://localhost:8900
 ```
 
 ### Access the Web Interface
 
-- **Swagger UI**: http://localhost:8000/docs (interactive testing)
-- **ReDoc**: http://localhost:8000/redoc (documentation)
-- **OpenAPI**: http://localhost:8000/openapi.json (raw spec)
+- **Swagger UI**: http://localhost:8900/docs (interactive testing)
+- **ReDoc**: http://localhost:8900/redoc (documentation)
+- **OpenAPI**: http://localhost:8900/openapi.json (raw spec)
 
 ## 📊 Test Results
 
@@ -78,7 +78,7 @@ docker compose up -d
 ### Submit Separation Job
 
 ```bash
-curl -X POST http://localhost:8000/api/v1/separate \
+curl -X POST http://localhost:8900/api/v1/separate \
   -F "file=@conversation.mp3" \
   -F "num_speakers=3" \
   -F "method=auto" \
@@ -88,25 +88,25 @@ curl -X POST http://localhost:8000/api/v1/separate \
 ### Get Job Status
 
 ```bash
-curl http://localhost:8000/api/v1/status/{job_id}
+curl http://localhost:8900/api/v1/status/{job_id}
 ```
 
 ### Get Results with Analysis
 
 ```bash
-curl http://localhost:8000/api/v1/results/{job_id}
+curl http://localhost:8900/api/v1/results/{job_id}
 ```
 
 ### Download Speaker Audio
 
 ```bash
-curl -o speaker_1.wav http://localhost:8000/api/v1/download/{job_id}/speaker_1
+curl -o speaker_1.wav http://localhost:8900/api/v1/download/{job_id}/speaker_1
 ```
 
 ### List All Jobs
 
 ```bash
-curl http://localhost:8000/api/v1/jobs
+curl http://localhost:8900/api/v1/jobs
 ```
 
 ## 📁 Project Structure
@@ -221,7 +221,7 @@ df -h /Users/pavanchilukuri/Desktop/voice-seperator
 
 ### docker-compose.yml
 - Container name: `speaker-separator-api`
-- Port mapping: `8000:8000`
+- Port mapping: `8900:8900`
 - Volumes: `uploads`, `outputs`, `conversation_output`
 - Environment: `OLLAMA_URL`, `API_PORT`
 
@@ -229,12 +229,12 @@ df -h /Users/pavanchilukuri/Desktop/voice-seperator
 - Base image: `python:3.11-slim`
 - Installs: ffmpeg, libsndfile1 (audio libraries)
 - Python packages: librosa, fastapi, uvicorn, scikit-learn, etc.
-- Exposes port: 8000
+- Exposes port: 8900
 
 ### Environment Variables
 ```bash
 OLLAMA_URL=http://192.168.1.33:11434  # Your Ollama instance
-API_PORT=8000                          # API port
+API_PORT=8900                          # API port
 PYTHONUNBUFFERED=1                     # Python output buffering
 ```
 
@@ -293,19 +293,19 @@ python speaker_separator.py audio.mp3 -n 2 -m clustering
 ```bash
 # Submit multiple jobs
 for file in audio_*.mp3; do
-  curl -X POST http://localhost:8000/api/v1/separate \
+  curl -X POST http://localhost:8900/api/v1/separate \
     -F "file=@$file" \
     -F "num_speakers=2"
 done
 
 # Monitor all
-curl http://localhost:8000/api/v1/jobs
+curl http://localhost:8900/api/v1/jobs
 ```
 
 ### Pattern 3: Scheduled Processing
 ```bash
 # Use cron to submit regular jobs
-0 2 * * * curl -X POST http://localhost:8000/api/v1/separate \
+0 2 * * * curl -X POST http://localhost:8900/api/v1/separate \
   -F "file=@/data/daily_recording.mp3"
 ```
 
@@ -313,9 +313,9 @@ curl http://localhost:8000/api/v1/jobs
 
 For questions or issues:
 1. Check logs: `docker compose logs -f`
-2. Test connectivity: `curl http://localhost:8000/`
+2. Test connectivity: `curl http://localhost:8900/`
 3. Verify Ollama: `curl http://192.168.1.33:11434/api/tags`
-4. Check API docs: http://localhost:8000/docs
+4. Check API docs: http://localhost:8900/docs
 
 ---
 

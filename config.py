@@ -53,7 +53,7 @@ class Config:
         
         # API Configuration
         self.API_HOST = os.getenv('API_HOST', '0.0.0.0')
-        self.API_PORT = int(os.getenv('API_PORT', '8000'))
+        self.API_PORT = int(os.getenv('API_PORT', '8900'))
         self.API_MAX_FILE_SIZE = int(os.getenv('API_MAX_FILE_SIZE', '104857600'))
         
         # Audio Processing Configuration
@@ -84,7 +84,7 @@ class Config:
         self.USE_GPU = os.getenv('USE_GPU', 'true').lower() == 'true'
         self.GPU_DEVICE = os.getenv('GPU_DEVICE', '')
         
-        # Security Configuration
+        # Security Configuration    
         cors_origins = os.getenv('CORS_ORIGINS', '*')
         self.CORS_ORIGINS = [origin.strip() for origin in cors_origins.split(',')]
         self.ENABLE_AUTH = os.getenv('ENABLE_AUTH', 'false').lower() == 'true'

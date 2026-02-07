@@ -53,6 +53,36 @@ function setWizardTitle(title, subtitle) {
   if (s) s.textContent = subtitle || "";
 }
 
+function setProgress(progress, message) {
+  const fill = $("progressFill");
+  const text = $("progressText");
+  const bar = document.querySelector(".progressBar");
+  const p = Number.isFinite(progress) ? Math.max(0, Math.min(100, progress)) : 0;
+  if (fill) fill.style.width = `${p}%`;
+  if (bar) bar.setAttribute("aria-valuenow", String(p));
+  if (text) text.textContent = message || "";
+}
+
+function renderDiagnosis(report) {
+  if (!report) return;
+  const card = $("diagnosisCard");
+  if (card) card.classList.remove("hidden");
+
+  if ($("diagSpeakers")) $("diagSpeakers").textContent = report.estimated_speakers ?? "—";
+  if ($("diagQuality")) $("diagQuality").textContent = report.audio_quality ?? "—";
+  if ($("diagDuration")) $("diagDuration").textContent = report.duration ? `${report.duration.toFixed(1)}s` : "—";
+  if ($("diagSr")) $("diagSr").textContent = report.sample_rate ? `${report.sample_rate} Hz` : "—";
+
+  const issues = $("diagIssues");
+  const recs = $("diagRecs");
+  if (issues) issues.innerHTML = (report.issues || []).length
+    ? (report.issues || []).map((x) => `<li>${x}</li>`).join("")
+    : "<li>None detected</li>";
+  if (recs) recs.innerHTML = (report.recommendations || []).length
+    ? (report.recommendations || []).map((x) => `<li>${x}</li>`).join("")
+    : "<li>No recommendations</li>";
+}
+
 function showLoader(title, subtitle) {
   const overlay = $("loaderOverlay");
   if (!overlay) return;
@@ -77,11 +107,21 @@ function renderDownloads(job) {
   const addBlock = (title, files, fileType) => {
     if (!files) return;
     const links = Object.entries(files).map(([key, filename]) => {
-      const href = `/api/v1/download/${job.job_id}/${fileType}/${encodeURIComponent(filename)}`;
-      return `<div><span class="mono">${key}</span>: <a href="${href}">${filename}</a></div>`;
+      const inlineHref = `/api/v1/download/${job.job_id}/${fileType}/${encodeURIComponent(filename)}?inline=1`;
+      const dlHref = `/api/v1/download/${job.job_id}/${fileType}/${encodeURIComponent(filename)}`;
+      return `
+        <div class="fileRow">
+          <div class="fileMeta">
+            <div class="fileName"><span class="mono">${key}</span></div>
+            <div class="fileSubtle mono">${filename}</div>
+          </div>
+          <audio class="fileAudio" controls preload="metadata" src="${inlineHref}"></audio>
+          <a class="fileDownload" href="${dlHref}">Download</a>
+        </div>
+      `;
     });
     if (links.length) {
-      blocks.push(`<div style="margin-bottom:10px;"><strong>${title}</strong>${links.join("")}</div>`);
+      blocks.push(`<div class="resultBlock"><div class="resultTitle">${title}</div>${links.join("")}</div>`);
     }
   };
 
@@ -116,8 +156,28 @@ function updateWizard(job) {
       : "";
   }
 
+  renderDiagnosis(report);
+
+  // Original audio preview (inline)
+  if ($("audioPreview") && $("audioPreviewWrap") && !window.__audioPreviewSet) {
+    $("audioPreview").src = `/api/v1/jobs/${job.job_id}/original`;
+    $("audioPreviewWrap").classList.remove("hidden");
+    window.__audioPreviewSet = true;
+  }
+
+  // Minimal separation summary
+  const chosenSpeakers = parseInt($("numSpeakers")?.value || "2", 10);
+  const chosenMethod = $("method")?.value || "gmm";
+  const suggested = report?.estimated_speakers;
+  if ($("separationSummary")) {
+    $("separationSummary").textContent = suggested
+      ? `Suggested: ${suggested} speaker(s) • Using: ${chosenSpeakers} • Method: ${chosenMethod}`
+      : `Using ${chosenSpeakers} speaker(s) • Method: ${chosenMethod}`;
+  }
+
   // Decide which single next step to show
   const status = job.status;
+  setProgress(job.progress ?? 0, job.progress_message || status || "");
   if (status === "failed") {
     hideLoader();
     setStepActive(1);
@@ -134,6 +194,11 @@ function updateWizard(job) {
     setStepActive(1);
     setWizardTitle("Step 1: Diagnose", "Analyze the audio before separating.");
     setHidden("sectionDiagnose", false);
+    // Auto-run diagnose once to reduce clicks (simple guided flow)
+    if (!window.__autoDiagnose) {
+      window.__autoDiagnose = true;
+      window.setTimeout(() => runDiagnose(), 400);
+    }
     return;
   }
 
@@ -274,13 +339,8 @@ async function runClean() {
 }
 
 function toggleDetails() {
-  const panel = $("detailsPanel");
-  if (!panel) return;
-  const nowHidden = panel.classList.toggle("hidden");
-  const b1 = $("btnToggleDetails");
-  const b2 = $("btnToggleDetails2");
-  if (b1) b1.textContent = nowHidden ? "Show technical details" : "Hide technical details";
-  if (b2) b2.textContent = nowHidden ? "Show technical details" : "Hide technical details";
+  // Legacy (detailsPanel was removed in the minimal UI)
+  return;
 }
 
 function wire() {
@@ -301,8 +361,6 @@ function wire() {
     setHidden("sectionClean", true);
     setHidden("sectionDownload", false);
   });
-  if ($("btnToggleDetails")) $("btnToggleDetails").addEventListener("click", toggleDetails);
-  if ($("btnToggleDetails2")) $("btnToggleDetails2").addEventListener("click", toggleDetails);
 }
 
 wire();

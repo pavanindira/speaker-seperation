@@ -58,7 +58,7 @@ except ImportError:
         OLLAMA_URL = os.getenv('OLLAMA_URL', 'http://localhost:11434')
         OLLAMA_MODEL = os.getenv('OLLAMA_MODEL', 'llama3.2')
         API_HOST = '0.0.0.0'
-        API_PORT = 8000
+        API_PORT = 8900
     config = Config()
 
 # ============================================================================

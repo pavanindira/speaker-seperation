@@ -91,7 +91,7 @@ HOP_LENGTH=512
 ```bash
 # API server host and port
 API_HOST=0.0.0.0
-API_PORT=8000
+API_PORT=8900
 
 # Max upload file size (100MB)
 API_MAX_FILE_SIZE=104857600
@@ -176,7 +176,7 @@ services:
     env_file:
       - .env
     ports:
-      - "${API_PORT}:8000"
+      - "${API_PORT}:8900"
 ```
 
 ### Option 2: Environment Variables
@@ -210,7 +210,7 @@ LOG_LEVEL=DEBUG
 OLLAMA_URL=http://ollama:11434
 OLLAMA_MODEL=llama3.2
 API_HOST=0.0.0.0
-API_PORT=8000
+API_PORT=8900
 CORS_ORIGINS=https://yourdomain.com
 ENABLE_AUTH=true
 API_KEY=your_secure_api_key_here

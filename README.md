@@ -216,10 +216,10 @@ python speaker_separator.py discussion.mp3 --method frequency
 
 ```bash
 # Upload and separate
-curl -X POST "http://localhost:8000/api/v1/separate-speakers?num_speakers=2&method=clustering" \
+curl -X POST "http://localhost:8900/api/v1/separate-speakers?num_speakers=2&method=clustering" \
   -F "file=@conversation.wav"
 
-# Response:
+# Response:   
 {
   "job_id": "abc-123",
   "status": "pending",
@@ -228,11 +228,11 @@ curl -X POST "http://localhost:8000/api/v1/separate-speakers?num_speakers=2&meth
 }
 
 # Check status
-curl http://localhost:8000/api/v1/jobs/abc-123
+curl http://localhost:8900/api/v1/jobs/abc-123
 
 # Download separated speakers
-curl -O http://localhost:8000/api/v1/download/abc-123/speaker_1
-curl -O http://localhost:8000/api/v1/download/abc-123/speaker_2
+curl -O http://localhost:8900/api/v1/download/abc-123/speaker_1
+curl -O http://localhost:8900/api/v1/download/abc-123/speaker_2
 ```
 
 ### Python Client
@@ -244,7 +244,7 @@ import time
 # Upload conversation
 with open('conversation.wav', 'rb') as f:
     response = requests.post(
-        'http://localhost:8000/api/v1/separate-speakers',
+        'http://localhost:8900/api/v1/separate-speakers',
         files={'file': f},
         params={
             'num_speakers': 2,
@@ -258,7 +258,7 @@ job_id = job['job_id']
 
 # Wait for completion
 while True:
-    status = requests.get(f'http://localhost:8000/api/v1/jobs/{job_id}')
+    status = requests.get(f'http://localhost:8900/api/v1/jobs/{job_id}')
     job = status.json()
     
     if job['status'] == 'completed':
@@ -270,7 +270,7 @@ while True:
         
         # Download each speaker
         for speaker_id in range(1, job['num_speakers'] + 1):
-            speaker_url = f"http://localhost:8000/api/v1/download/{job_id}/speaker_{speaker_id}"
+            speaker_url = f"http://localhost:8900/api/v1/download/{job_id}/speaker_{speaker_id}"
             audio = requests.get(speaker_url)
             
             with open(f'speaker_{speaker_id}.wav', 'wb') as f:

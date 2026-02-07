@@ -3,145 +3,171 @@
 {% block title %}Job {{ job_id }} | Speaker Separation{% endblock %}
 
 {% block content %}
-  <section class="hero">
-    <h1>Job</h1>
+  <section class="hero narrow centerLayout">
+    <h1>Processing</h1>
     <p class="subtle">
       <span class="mono">{{ job_id }}</span>
       <span class="pill" id="statusPill">loading…</span>
     </p>
+    <div class="progressWrap">
+      <div class="progressBar" role="progressbar" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0">
+        <div class="progressFill" id="progressFill" style="width: 0%"></div>
+      </div>
+      <div class="progressText" id="progressText">Loading…</div>
+    </div>
   </section>
 
-  <section class="card">
-    <div class="stepper" aria-label="Workflow steps">
+  <section class="card narrow centerLayout">
+    <div class="stepper stepperCompact" aria-label="Workflow steps">
       <div class="step" id="step1">
         <div class="dot">1</div>
         <div class="meta">
           <div class="name">Diagnose</div>
-          <div class="desc">Analyze audio & suggest speakers</div>
+          <div class="desc">Analyze audio</div>
         </div>
       </div>
       <div class="step" id="step2">
         <div class="dot">2</div>
         <div class="meta">
           <div class="name">Separate</div>
-          <div class="desc">Choose method & start</div>
+          <div class="desc">Split speakers</div>
         </div>
       </div>
       <div class="step" id="step3">
         <div class="dot">3</div>
         <div class="meta">
           <div class="name">Clean</div>
-          <div class="desc">Optional post-processing</div>
+          <div class="desc">Optional</div>
         </div>
       </div>
       <div class="step" id="step4">
         <div class="dot">4</div>
         <div class="meta">
           <div class="name">Download</div>
-          <div class="desc">Grab the output files</div>
+          <div class="desc">Listen + save</div>
         </div>
       </div>
     </div>
   </section>
 
-  <section class="grid">
-    <div class="card">
-      <h2 id="wizardTitle">Step</h2>
-      <p class="subtle" id="wizardSubtitle">Loading…</p>
+  <section class="card narrow centerLayout">
+    <h2 id="wizardTitle">Loading…</h2>
+    <p class="subtle" id="wizardSubtitle">Please wait.</p>
 
-      <div id="alert" class="alert hidden"></div>
+    <div id="alert" class="alert hidden"></div>
 
-      <!-- Step 1 -->
-      <div id="sectionDiagnose" class="wizardSection hidden">
-        <p class="subtle">
-          First, run a quick diagnosis so we can estimate the number of speakers and catch quality issues.
-        </p>
-        <div class="actions">
-          <button class="button" id="btnDiagnose">Run diagnosis</button>
+    <div class="audioPreview hidden" id="audioPreviewWrap">
+      <div class="label">Original audio</div>
+      <audio id="audioPreview" controls preload="metadata"></audio>
+    </div>
+
+    <div id="diagnosisCard" class="summaryCard hidden">
+      <div class="summaryGrid">
+        <div class="summaryItem">
+          <div class="label">Estimated speakers</div>
+          <div class="summaryValue" id="diagSpeakers">—</div>
+        </div>
+        <div class="summaryItem">
+          <div class="label">Quality</div>
+          <div class="summaryValue" id="diagQuality">—</div>
+        </div>
+        <div class="summaryItem">
+          <div class="label">Duration</div>
+          <div class="summaryValue" id="diagDuration">—</div>
+        </div>
+        <div class="summaryItem">
+          <div class="label">Sample rate</div>
+          <div class="summaryValue" id="diagSr">—</div>
         </div>
       </div>
-
-      <!-- Step 2 -->
-      <div id="sectionSeparate" class="wizardSection hidden">
-        <p class="subtle">
-          Next, confirm separation settings and start processing.
-        </p>
-        <div class="row">
-          <div>
-            <label class="label" for="numSpeakers">Speakers</label>
-            <input class="input small" id="numSpeakers" type="number" min="1" max="10" value="2" />
-            <div class="hint" id="speakerHint"></div>
-          </div>
-
-          <div>
-            <label class="label" for="method">Method</label>
-            <select class="input small" id="method">
-              <option value="gmm" selected>gmm (recommended)</option>
-              <option value="kmeans">kmeans</option>
-              <option value="spectral">spectral</option>
-            </select>
-            <div class="hint">If unsure, keep <span class="mono">gmm</span>.</div>
-          </div>
+      <div class="summaryLists">
+        <div>
+          <div class="label">Issues</div>
+          <ul class="list" id="diagIssues"></ul>
         </div>
-        <div class="actions">
-          <button class="button" id="btnProceed">Start separation</button>
-          <button class="button secondary" id="btnBackToDiagnose" type="button">Back</button>
-        </div>
-      </div>
-
-      <!-- Processing -->
-      <div id="sectionProcessing" class="wizardSection hidden">
-        <p class="subtle">
-          Processing in progress. This page will update automatically.
-        </p>
-        <div class="actions">
-          <button class="button secondary" id="btnRefresh" type="button">Refresh now</button>
-        </div>
-      </div>
-
-      <!-- Step 3 -->
-      <div id="sectionClean" class="wizardSection hidden">
-        <p class="subtle">
-          Separation finished. Optionally clean the separated tracks (silence/noise/clicks/normalize).
-        </p>
-        <div class="actions">
-          <button class="button" id="btnClean">Clean separated files</button>
-          <button class="button secondary" id="btnSkipClean" type="button">Skip</button>
-        </div>
-      </div>
-
-      <!-- Step 4 -->
-      <div id="sectionDownload" class="wizardSection hidden">
-        <p class="subtle">
-          Your files are ready.
-        </p>
-        <div class="actions">
-          <a class="button secondary" href="/ui">Upload another</a>
-          <button class="button secondary" id="btnToggleDetails" type="button">Show technical details</button>
-        </div>
-      </div>
-
-      <!-- Failed -->
-      <div id="sectionFailed" class="wizardSection hidden">
-        <p class="subtle">
-          This job failed. Check the error below (and the server logs).
-        </p>
-        <div class="actions">
-          <a class="button secondary" href="/ui">Upload another</a>
-          <button class="button secondary" id="btnToggleDetails2" type="button">Show technical details</button>
+        <div>
+          <div class="label">Recommendations</div>
+          <ul class="list" id="diagRecs"></ul>
         </div>
       </div>
     </div>
 
-    <div class="card">
-      <h2>Downloads</h2>
-      <div id="downloads" class="downloads subtle">No files yet.</div>
+    <!-- Step 1 -->
+    <div id="sectionDiagnose" class="wizardSection hidden">
+      <div class="actions">
+        <button class="button" id="btnDiagnose">Analyze audio</button>
+      </div>
+    </div>
 
-      <div id="detailsPanel" class="hidden" style="margin-top: 14px;">
-        <h2>Technical details</h2>
+    <!-- Step 2 -->
+    <div id="sectionSeparate" class="wizardSection hidden">
+      <div class="summaryLine" id="separationSummary"></div>
+      <div class="actions">
+        <button class="button" id="btnProceed">Start separation</button>
+      </div>
+
+      <details class="details leftLayout">
+        <summary class="detailsSummary">Advanced settings</summary>
+        <div class="detailsBody">
+          <div class="row">
+            <div>
+              <label class="label" for="numSpeakers">Speakers</label>
+              <input class="input small" id="numSpeakers" type="number" min="1" max="10" value="2" />
+              <div class="hint" id="speakerHint"></div>
+            </div>
+
+            <div>
+              <label class="label" for="method">Method</label>
+              <select class="input small" id="method">
+                <option value="gmm" selected>gmm (recommended)</option>
+                <option value="kmeans">kmeans</option>
+                <option value="spectral">spectral</option>
+              </select>
+              <div class="hint">If unsure, keep <span class="mono">gmm</span>.</div>
+            </div>
+          </div>
+        </div>
+      </details>
+    </div>
+
+    <!-- Processing -->
+    <div id="sectionProcessing" class="wizardSection hidden">
+      <p class="subtle">Working in the background. This page updates automatically.</p>
+    </div>
+
+    <!-- Step 3 -->
+    <div id="sectionClean" class="wizardSection hidden">
+      <div class="actions">
+        <button class="button" id="btnClean">Clean audio (optional)</button>
+        <button class="button secondary" id="btnSkipClean" type="button">Skip</button>
+      </div>
+    </div>
+
+    <!-- Step 4 -->
+    <div id="sectionDownload" class="wizardSection hidden">
+      <div class="actions">
+        <a class="button secondary" href="/ui">Upload another</a>
+      </div>
+    </div>
+
+    <!-- Failed -->
+    <div id="sectionFailed" class="wizardSection hidden">
+      <div class="actions">
+        <a class="button secondary" href="/ui">Upload another</a>
+      </div>
+    </div>
+
+    <details class="details subtle leftLayout" style="margin-top: 12px;">
+      <summary class="detailsSummary">Debug info</summary>
+      <div class="detailsBody">
         <pre class="pre" id="jobJson">Loading…</pre>
       </div>
-    </div>
+    </details>
+  </section>
+
+  <section class="card narrow">
+    <h2>Results</h2>
+    <div id="downloads" class="downloads subtle">No files yet.</div>
   </section>
 
   <!-- Full-page loader overlay -->
@@ -161,6 +187,6 @@
     const jobId = "{{ job_id }}";
   </script>
   <!-- Cache-bust static assets to avoid stale UI -->
-  <script src="/static/ui.js?v=4"></script>
+  <script src="/static/ui.js?v=6"></script>
 {% endblock %}
 

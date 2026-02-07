@@ -32,14 +32,14 @@ RUN mkdir -p conversation_output uploads outputs
 # Set environment variables
 ENV PYTHONUNBUFFERED=1
 ENV OLLAMA_URL=http://192.168.1.33:11434
-ENV API_PORT=8000
+ENV API_PORT=8900
 
 # Expose port for API
-EXPOSE 8000
+EXPOSE 8900
 
 # Default command - API mode
 #CMD ["python", "final_speaker_api.py"]
-#    CMD curl -f http://localhost:8000/health || exit 1
+#    CMD curl -f http://localhost:8900/health || exit 1
 
 # Run the application
-CMD ["python", "final_speaker_api.py", "--host", "0.0.0.0", "--port", "8000"]
+CMD ["python", "final_speaker_api.py", "--host", "0.0.0.0", "--port", "8900"]

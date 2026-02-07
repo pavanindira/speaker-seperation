@@ -6,7 +6,7 @@ API Test Script - Tests 3-speaker separation capability
 import requests
 import time
 
-api_url = "http://localhost:8000"
+api_url = "http://localhost:8900"
 
 print("="*60)
 print("Speaker Separator API - 3-Speaker Test")
