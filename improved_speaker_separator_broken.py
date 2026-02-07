@@ -8,7 +8,7 @@ import os
 import sys
 import subprocess
 from pathlib import Path
-from typing import List, Dict, Tuple, Optional
+from typing import List, Dict, Tuple
 import warnings
 warnings.filterwarnings('ignore')
 
@@ -248,8 +248,7 @@ class ImprovedSpeakerSeparator:
     
     def separate_speakers(self, audio_path: Path, 
                          n_speakers: int = 2,
-                         method: str = 'gmm',
-                         progress_callback: Optional[callable] = None) -> Dict:
+                         method: str = 'gmm') -> Dict:
         """
         Main speaker separation pipeline
         """
@@ -269,15 +268,9 @@ class ImprovedSpeakerSeparator:
         frame_length = 2048
         
         # Step 1: Extract features
-        if progress_callback:
-            try: progress_callback(10, 'Loading complete: extracting features')
-            except: pass
         features = self.extract_enhanced_features(y, sr)
         
         # Step 2: Detect voice activity
-        if progress_callback:
-            try: progress_callback(30, 'Detecting voice activity')
-            except: pass
         voice_activity = self.detect_voice_activity(y, sr, frame_length, hop_length)
         
         # Ensure features and voice_activity align
@@ -287,9 +280,6 @@ class ImprovedSpeakerSeparator:
         
         # Step 3: Cluster speakers
         try:
-            if progress_callback:
-                try: progress_callback(50, 'Clustering speakers')
-                except: pass
             labels = self.cluster_speakers_advanced(
                 features, voice_activity, n_speakers, method
             )
@@ -299,18 +289,11 @@ class ImprovedSpeakerSeparator:
             raise
         
         # Step 4: Separate and save
-        if progress_callback:
-            try: progress_callback(70, 'Separating and saving speaker audio')
-            except: pass
         separated_files = self.separate_and_save(y, sr, labels, hop_length, n_speakers)
         
         print("\n" + "=" * 60)
         print("✓ Separation Complete!")
         print("=" * 60)
-        
-        if progress_callback:
-            try: progress_callback(100, 'Separation complete')
-            except: pass
         
         return {
             "speakers": separated_files,
@@ -324,8 +307,9 @@ def analyze_separation_quality(output_dir: Path, n_speakers: int):
     Analyze the quality of speaker separation
     """
     print("\n" + "=" * 60)
-    print("Quality Analysis")
-    print("=" * 60)
+                         n_speakers: int = 2,
+                         method: str = 'gmm',
+                         progress_callback=None) -> Dict:
     
     for speaker_id in range(1, n_speakers + 1):
         speaker_file = output_dir / f"speaker_{speaker_id}.wav"

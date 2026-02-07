@@ -17,7 +17,7 @@ from enum import Enum
 # Install FastAPI dependencies if needed
 try:
     from fastapi import FastAPI, File, UploadFile, HTTPException, BackgroundTasks, Query, Form, Request
-    from fastapi.responses import FileResponse, JSONResponse, HTMLResponse, RedirectResponse, Response
+    from fastapi.responses import FileResponse, JSONResponse, HTMLResponse, RedirectResponse, Response, StreamingResponse
     from fastapi.middleware.cors import CORSMiddleware
     from fastapi.staticfiles import StaticFiles
     from fastapi.templating import Jinja2Templates
@@ -28,7 +28,7 @@ except ImportError:
     subprocess.check_call([sys.executable, "-m", "pip", "install", 
                           "fastapi", "uvicorn[standard]", "python-multipart", "aiofiles"])
     from fastapi import FastAPI, File, UploadFile, HTTPException, BackgroundTasks, Query, Form, Request
-    from fastapi.responses import FileResponse, JSONResponse, HTMLResponse, RedirectResponse, Response
+    from fastapi.responses import FileResponse, JSONResponse, HTMLResponse, RedirectResponse, Response, StreamingResponse
     from fastapi.middleware.cors import CORSMiddleware
     from fastapi.staticfiles import StaticFiles
     from fastapi.templating import Jinja2Templates
@@ -174,7 +174,7 @@ try:
     # Add current directory to path
     sys.path.insert(0, str(Path(__file__).parent))
     
-    from improved_speaker_separator import ImprovedSpeakerSeparator
+    from improved_speaker_separator_fixed import ImprovedSpeakerSeparator
     SEPARATOR_AVAILABLE = True
     print("✓ Loaded ImprovedSpeakerSeparator")
 except Exception as e:
@@ -194,7 +194,8 @@ except Exception as e:
 # ============================================================================
 
 if not SEPARATOR_AVAILABLE:
-    from sklearn.cluster import KMeans, GaussianMixture
+    from sklearn.cluster import KMeans, SpectralClustering
+    from sklearn.mixture import GaussianMixture
     from sklearn.preprocessing import StandardScaler
     from scipy.ndimage import median_filter
     from scipy.signal import medfilt
@@ -606,12 +607,19 @@ async def process_separation_task(job_id: str, audio_path: Path,
         # Separate speakers
         separator = ImprovedSpeakerSeparator(job_output_dir)
         _set_job_progress(job_id, 45, "Separating speakers…")
-        
+
+        # Progress callback called from worker thread
+        def _progress_callback(pct: int, message: Optional[str] = None):
+            try:
+                _set_job_progress(job_id, pct, message)
+            except Exception:
+                pass
+
         # Load and process in thread pool to avoid blocking
         loop = asyncio.get_event_loop()
         results = await loop.run_in_executor(
             None,
-            lambda: separator.separate_speakers(audio_path, num_speakers, method)
+            lambda: separator.separate_speakers(audio_path, num_speakers, method, progress_callback=_progress_callback)
         )
         _set_job_progress(job_id, 65, "Finalizing outputs…")
         
@@ -946,7 +954,7 @@ async def proceed_with_separation(
     return JobResponse(**jobs_db[job_id])
 
 
-@app.get("/api/v1/jobs/{job_id}", response_model=JobResponse)
+@app.get("/api/v1/jobs/{job_id}")
 async def get_job_status(job_id: str):
     """
     Step 4: Get job status
@@ -957,6 +965,54 @@ async def get_job_status(job_id: str):
         raise HTTPException(404, "Job not found")
     
     return JobResponse(**jobs_db[job_id])
+
+
+@app.get("/api/v1/jobs/{job_id}/stream")
+async def stream_job_status(job_id: str):
+    """
+    Real-time job status using Server-Sent Events (SSE)
+    Client opens EventSource connection; server streams updates as job progresses
+    """
+    if job_id not in jobs_db:
+        raise HTTPException(404, "Job not found")
+    
+    async def event_generator():
+        """Stream job status updates"""
+        last_progress = -1
+        last_status = None
+        
+        while True:
+            job = jobs_db.get(job_id)
+            if not job:
+                break
+            
+            # Send update if progress or status changed
+            progress = job.get('progress', 0)
+            status = job.get('status')
+            message = job.get('progress_message', '')
+            
+            if progress != last_progress or status != last_status:
+                yield f"data: {json.dumps({'progress': progress, 'status': status, 'message': message})}\n\n"
+                last_progress = progress
+                last_status = status
+            
+            # Stop if job completed/failed
+            if status in [JobStatus.COMPLETED, JobStatus.SEPARATED, JobStatus.FAILED]:
+                # Send final update with full job data
+                yield f"data: {json.dumps(jobs_db[job_id])}\n\n"
+                break
+            
+            await asyncio.sleep(0.5)  # Update every 500ms
+    
+    return StreamingResponse(
+        event_generator(),
+        media_type="text/event-stream",
+        headers={
+            "Cache-Control": "no-cache",
+            "Connection": "keep-alive"
+        }
+    )
+
 
 
 @app.post("/api/v1/jobs/{job_id}/clean", response_model=JobResponse)
