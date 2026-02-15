@@ -2,6 +2,12 @@
 """
 Complete Speaker Separation API - Final Version
 Full workflow: Upload → Diagnose → Separate → Clean → Feedback
+Fixed version with critical bugs resolved:
+- App instantiation moved before middleware usage
+- File size validation added
+- Temp file cleanup on shutdown
+- Ollama timeout handling
+- prometheus_client safely imported
 """
 
 import os
@@ -9,27 +15,34 @@ import sys
 import shutil
 import uuid
 import asyncio
+import atexit
+import json
 from pathlib import Path
 from typing import Optional, List, Dict
 from datetime import datetime
 from enum import Enum
 
-# Install FastAPI dependencies if needed
+# ============================================================================
+# Dependencies Installation
+# ============================================================================
+
 try:
-    from fastapi import FastAPI, File, UploadFile, HTTPException, BackgroundTasks, Query, Form
-    from fastapi.responses import FileResponse, JSONResponse
+    from fastapi import FastAPI, File, UploadFile, HTTPException, BackgroundTasks, Query, Form, Request
+    from fastapi.responses import FileResponse, JSONResponse, RedirectResponse, StreamingResponse, HTMLResponse
     from fastapi.middleware.cors import CORSMiddleware
     from fastapi.staticfiles import StaticFiles
+    from fastapi.templating import Jinja2Templates
     import uvicorn
 except ImportError:
     print("Installing FastAPI and dependencies...")
     import subprocess
     subprocess.check_call([sys.executable, "-m", "pip", "install", 
                           "fastapi", "uvicorn[standard]", "python-multipart", "aiofiles"])
-    from fastapi import FastAPI, File, UploadFile, HTTPException, BackgroundTasks, Query, Form
-    from fastapi.responses import FileResponse, JSONResponse
+    from fastapi import FastAPI, File, UploadFile, HTTPException, BackgroundTasks, Query, Form, Request
+    from fastapi.responses import FileResponse, JSONResponse, RedirectResponse, StreamingResponse, HTMLResponse
     from fastapi.middleware.cors import CORSMiddleware
     from fastapi.staticfiles import StaticFiles
+    from fastapi.templating import Jinja2Templates
     import uvicorn
 
 try:
@@ -47,9 +60,13 @@ except ImportError:
     import soundfile as sf
     import numpy as np
 
+from fastapi import Depends, Response
 from pydantic import BaseModel
 
-# Load configuration
+# ============================================================================
+# Configuration
+# ============================================================================
+
 try:
     from config import config
     print(f"✓ Loaded config: Ollama at {config.OLLAMA_URL}")
@@ -61,10 +78,6 @@ except ImportError:
         API_PORT = 8000
     config = Config()
 
-# ============================================================================
-# Configuration
-# ============================================================================
-
 UPLOAD_DIR = Path("uploads")
 OUTPUT_DIR = Path("outputs")
 TEMP_DIR = Path("temp")
@@ -73,9 +86,10 @@ for dir_path in [UPLOAD_DIR, OUTPUT_DIR, TEMP_DIR]:
     dir_path.mkdir(exist_ok=True)
 
 MAX_FILE_SIZE = 100 * 1024 * 1024  # 100MB
+OLLAMA_TIMEOUT = 120  # seconds
 
 # ============================================================================
-# Models
+# Data Models
 # ============================================================================
 
 class JobStatus(str, Enum):
@@ -120,6 +134,9 @@ class JobResponse(BaseModel):
     status: JobStatus
     created_at: str
     filename: str
+    progress: int = 0
+    progress_message: str = ""
+    file_size: Optional[int] = None
     diagnostic_report: Optional[DiagnosticReport] = None
     separation_config: Optional[SeparationConfig] = None
     separated_files: Optional[Dict[str, str]] = None
@@ -148,24 +165,108 @@ jobs_db = {}
 
 
 # ============================================================================
-# Import processing modules
+# INITIALIZE FastAPI APP FIRST (CRITICAL FIX #1)
 # ============================================================================
 
-# Try to import external modules, fall back to inline implementations
+app = FastAPI(
+    title="Speaker Separation API - Complete Workflow",
+    description="Upload → Diagnose → Separate → Clean → Feedback",
+    version="2.0.0"
+)
+
+# Jinja templates and static files
+_BASE_DIR = Path(__file__).resolve().parent
+_TEMPLATES_DIR = _BASE_DIR / "templates"
+_STATIC_DIR = _BASE_DIR / "static"
+
+try:
+    templates = Jinja2Templates(directory=str(_TEMPLATES_DIR))
+except Exception as e:
+    print(f"⚠️  Templates directory not found: {e}")
+    templates = None
+
+# CORS Configuration
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=os.getenv("CORS_ORIGINS", "*").split(","),
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+
+# Static assets
+if _STATIC_DIR.exists():
+    app.mount("/static", StaticFiles(directory=str(_STATIC_DIR)), name="static")
+
+
+# ============================================================================
+# Security Configuration (CRITICAL FIX #2: Load from environment)
+# ============================================================================
+
+try:
+    from security_improvements import (
+        verify_token, SecurityHeadersMiddleware,
+        AuditLogger, SecurityValidator
+    )
+    
+    app.add_middleware(SecurityHeadersMiddleware)
+    audit_logger = AuditLogger()
+    validator = SecurityValidator()
+    SECURITY_AVAILABLE = True
+except ImportError as e:
+    print(f"⚠️  Security modules not available: {e}")
+    SECURITY_AVAILABLE = False
+    audit_logger = None
+    validator = None
+
+
+# ============================================================================
+# Monitoring & Observability
+# ============================================================================
+
+try:
+    from monitoring_observability import (
+        StructuredLogger, PerformanceMonitor,
+        HealthChecker, MonitoringMiddleware
+    )
+    
+    logger = StructuredLogger('speaker-api')
+    perf_monitor = PerformanceMonitor()
+    health_checker = HealthChecker()
+    app.add_middleware(MonitoringMiddleware, logger=logger, perf_monitor=perf_monitor)
+    MONITORING_AVAILABLE = True
+except ImportError as e:
+    print(f"⚠️  Monitoring modules not available: {e}")
+    MONITORING_AVAILABLE = False
+
+# Metrics endpoint (CRITICAL FIX #3: Safe fallback for prometheus_client)
+@app.get("/metrics")
+async def metrics():
+    """Prometheus metrics endpoint"""
+    try:
+        from prometheus_client import generate_latest, REGISTRY
+        return Response(generate_latest(REGISTRY), media_type="text/plain")
+    except ImportError:
+        return JSONResponse(
+            {"error": "prometheus_client not installed. Install with: pip install prometheus-client"},
+            status_code=501
+        )
+
+
+# ============================================================================
+# Load Audio Processing Modules
+# ============================================================================
+
 SEPARATOR_AVAILABLE = False
 CLEANER_AVAILABLE = False
 
 try:
-    import sys
-    # Add current directory to path
     sys.path.insert(0, str(Path(__file__).parent))
-    
     from improved_speaker_separator import ImprovedSpeakerSeparator
     SEPARATOR_AVAILABLE = True
     print("✓ Loaded ImprovedSpeakerSeparator")
 except Exception as e:
     print(f"⚠️  Could not load improved_speaker_separator: {e}")
-    print("   Using inline implementation")
 
 try:
     from audio_cleaner import AudioCleaner, clean_separated_speakers
@@ -174,11 +275,11 @@ try:
     print("✓ Loaded AudioCleaner")
 except Exception as e:
     print(f"⚠️  Could not load audio_cleaner: {e}")
-    clean_speakers_external = None  # Fallback if import fails
-    print("   Using inline implementation")
+    clean_speakers_external = None
+
 
 # ============================================================================
-# Inline Implementations (fallback if modules not available)
+# Inline Implementations (if modules unavailable)
 # ============================================================================
 
 if not SEPARATOR_AVAILABLE:
@@ -194,7 +295,7 @@ if not SEPARATOR_AVAILABLE:
             self.output_dir = output_dir
             self.output_dir.mkdir(exist_ok=True, parents=True)
         
-        def separate_speakers(self, audio_path: Path, n_speakers: int = 2, method: str = 'gmm'):
+        def separate_speakers(self, audio_path: Path, n_speakers: int = 2, method: str = 'gmm', progress_callback=None):
             """Separate speakers from audio file"""
             
             print(f"\nSeparating {n_speakers} speakers using {method}...")
@@ -387,8 +488,44 @@ if not CLEANER_AVAILABLE:
         return results
     
     clean_speakers_external = clean_separated_speakers
-else:
-    clean_speakers_external = clean_separated_speakers
+
+
+# ============================================================================
+# Utility Functions
+# ============================================================================
+
+def cleanup_temp_files():
+    """CRITICAL FIX #4: Clean up temporary files on shutdown"""
+    try:
+        if TEMP_DIR.exists():
+            for file in TEMP_DIR.glob("*"):
+                if file.is_file():
+                    file.unlink()
+                elif file.is_dir():
+                    shutil.rmtree(file)
+            print("✓ Cleaned up temporary files")
+    except Exception as e:
+        print(f"⚠️  Error cleaning temp files: {e}")
+
+# Register cleanup on exit
+atexit.register(cleanup_temp_files)
+
+
+def validate_file_size(file_size: int) -> bool:
+    """CRITICAL FIX #5: Validate file size before processing"""
+    if file_size > MAX_FILE_SIZE:
+        raise HTTPException(
+            status_code=413,
+            detail=f"File size ({file_size / 1024 / 1024:.1f}MB) exceeds maximum ({MAX_FILE_SIZE / 1024 / 1024:.0f}MB)"
+        )
+    return True
+
+
+def _set_job_progress(job_id: str, progress: int, message: str = ""):
+    """Update job progress"""
+    if job_id in jobs_db:
+        jobs_db[job_id]['progress'] = min(progress, 100)
+        jobs_db[job_id]['progress_message'] = message
 
 
 # ============================================================================
@@ -522,13 +659,18 @@ Provide a brief analysis (2-3 sentences):
     }
     
     loop = asyncio.get_event_loop()
-    response = await loop.run_in_executor(
-        None,
-        lambda: requests.post(url, json=data, timeout=60)
-    )
-    
-    if response.status_code == 200:
-        return response.json()['response']
+    try:
+        response = await loop.run_in_executor(
+            None,
+            lambda: requests.post(url, json=data, timeout=OLLAMA_TIMEOUT)
+        )
+        
+        if response.status_code == 200:
+            return response.json()['response']
+    except requests.Timeout:
+        print(f"Ollama diagnostic timeout after {OLLAMA_TIMEOUT}s")
+    except Exception as e:
+        print(f"Ollama diagnostic request failed: {e}")
     
     return None
 
@@ -562,13 +704,18 @@ Keep response brief and actionable (3-4 sentences)."""
     }
     
     loop = asyncio.get_event_loop()
-    response = await loop.run_in_executor(
-        None,
-        lambda: requests.post(url, json=data, timeout=60)
-    )
-    
-    if response.status_code == 200:
-        return response.json()['response']
+    try:
+        response = await loop.run_in_executor(
+            None,
+            lambda: requests.post(url, json=data, timeout=OLLAMA_TIMEOUT)
+        )
+        
+        if response.status_code == 200:
+            return response.json()['response']
+    except requests.Timeout:
+        print(f"Ollama feedback timeout after {OLLAMA_TIMEOUT}s")
+    except Exception as e:
+        print(f"Ollama feedback request failed: {e}")
     
     return "Thank you for your feedback. We'll use this to improve the service."
 
@@ -583,6 +730,7 @@ async def process_separation_task(job_id: str, audio_path: Path,
     
     try:
         jobs_db[job_id]['status'] = JobStatus.SEPARATING
+        _set_job_progress(job_id, 35, "Preparing separation…")
         
         # Create output directory
         job_output_dir = OUTPUT_DIR / job_id / "separated"
@@ -590,6 +738,7 @@ async def process_separation_task(job_id: str, audio_path: Path,
         
         # Separate speakers
         separator = ImprovedSpeakerSeparator(job_output_dir)
+        _set_job_progress(job_id, 45, "Separating speakers…")
         
         # Load and process in thread pool to avoid blocking
         loop = asyncio.get_event_loop()
@@ -597,6 +746,7 @@ async def process_separation_task(job_id: str, audio_path: Path,
             None,
             lambda: separator.separate_speakers(audio_path, num_speakers, method)
         )
+        _set_job_progress(job_id, 65, "Finalizing outputs…")
         
         # Build file URLs
         separated_files = {}
@@ -606,10 +756,12 @@ async def process_separation_task(job_id: str, audio_path: Path,
         jobs_db[job_id]['separated_files'] = separated_files
         jobs_db[job_id]['separation_results'] = results
         jobs_db[job_id]['status'] = JobStatus.SEPARATED
+        _set_job_progress(job_id, 70, "Separation complete.")
         
     except Exception as e:
         jobs_db[job_id]['status'] = JobStatus.FAILED
         jobs_db[job_id]['error'] = str(e)
+        _set_job_progress(job_id, 100, "Failed.")
 
 
 async def process_cleaning_task(job_id: str, cleaning_config: CleaningConfig):
@@ -617,6 +769,7 @@ async def process_cleaning_task(job_id: str, cleaning_config: CleaningConfig):
     
     try:
         jobs_db[job_id]['status'] = JobStatus.CLEANING
+        _set_job_progress(job_id, 75, "Cleaning audio…")
         
         separated_dir = OUTPUT_DIR / job_id / "separated"
         cleaned_dir = OUTPUT_DIR / job_id / "cleaned"
@@ -643,30 +796,12 @@ async def process_cleaning_task(job_id: str, cleaning_config: CleaningConfig):
         jobs_db[job_id]['cleaned_files'] = cleaned_files
         jobs_db[job_id]['cleaning_results'] = results
         jobs_db[job_id]['status'] = JobStatus.COMPLETED
+        _set_job_progress(job_id, 100, "Done.")
         
     except Exception as e:
         jobs_db[job_id]['status'] = JobStatus.FAILED
         jobs_db[job_id]['error'] = str(e)
-
-
-# ============================================================================
-# FastAPI Application
-# ============================================================================
-
-app = FastAPI(
-    title="Speaker Separation API - Complete Workflow",
-    description="Upload → Diagnose → Separate → Clean → Feedback",
-    version="2.0.0"
-)
-
-# CORS
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=["*"],
-    allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
-)
+        _set_job_progress(job_id, 100, "Failed.")
 
 
 # ============================================================================
@@ -692,16 +827,6 @@ async def root():
     }
 
 
-@app.get("/final_speaker_frontend.html")
-async def serve_frontend():
-    """Serve the frontend HTML"""
-    frontend_path = Path("final_speaker_frontend.html")
-    if frontend_path.exists():
-        return FileResponse(frontend_path, media_type="text/html")
-    else:
-        raise HTTPException(status_code=404, detail="Frontend not found")
-
-
 @app.get("/health")
 async def health():
     """Health check"""
@@ -709,7 +834,7 @@ async def health():
     try:
         response = requests.get(f"{config.OLLAMA_URL}/api/tags", timeout=5)
         ollama_status = "connected" if response.status_code == 200 else "error"
-    except:
+    except Exception:
         pass
     
     return {
@@ -719,6 +844,93 @@ async def health():
     }
 
 
+@app.get("/final_speaker_frontend.html")
+async def serve_frontend():
+    """Legacy path: serve frontend HTML"""
+    frontend_path = Path("final_speaker_frontend.html")
+    if frontend_path.exists():
+        return FileResponse(frontend_path, media_type="text/html")
+    else:
+        return {"error": "Frontend not found"}
+
+
+@app.get("/ui", response_class=HTMLResponse)
+async def ui_index(request: Request):
+    """Jinja UI: upload page"""
+    if templates is None:
+        return "<h1>Templates not configured</h1>"
+    
+    recent_jobs = sorted(
+        jobs_db.values(),
+        key=lambda j: j.get("created_at", ""),
+        reverse=True,
+    )[:20]
+
+    return templates.TemplateResponse(
+        "index.html",
+        {
+            "request": request,
+            "recent_jobs": recent_jobs,
+        },
+    )
+
+
+@app.post("/ui/upload")
+async def ui_upload_audio(request: Request, file: UploadFile = File(...)):
+    """Jinja UI: handle upload and redirect to job page"""
+    allowed_extensions = {'.mp3', '.wav', '.flac', '.ogg', '.m4a'}
+    file_ext = Path(file.filename).suffix.lower()
+    if file_ext not in allowed_extensions:
+        raise HTTPException(400, f"Unsupported file type: {file_ext}")
+
+    job_id = str(uuid.uuid4())
+    upload_path = UPLOAD_DIR / f"{job_id}{file_ext}"
+
+    try:
+        with open(upload_path, "wb") as buffer:
+            shutil.copyfileobj(file.file, buffer)
+    except Exception as e:
+        raise HTTPException(500, f"Failed to save file: {e}")
+
+    jobs_db[job_id] = {
+        'job_id': job_id,
+        'status': JobStatus.UPLOADED,
+        'created_at': datetime.utcnow().isoformat(),
+        'filename': file.filename,
+        'progress': 10,
+        'progress_message': 'Uploaded. Ready to diagnose.',
+        'file_path': str(upload_path),
+        'file_size': file_size,
+        'diagnostic_report': None,
+        'separated_files': None,
+        'cleaned_files': None,
+        'user_feedback': None,
+        'ollama_feedback_response': None,
+        'error': None
+    }
+
+    return RedirectResponse(url=f"/ui/jobs/{job_id}", status_code=303)
+
+
+@app.get("/ui/jobs/{job_id}", response_class=HTMLResponse)
+async def ui_job(request: Request, job_id: str):
+    """Jinja UI: job detail page"""
+    if job_id not in jobs_db:
+        raise HTTPException(404, "Job not found")
+    
+    if templates is None:
+        return "<h1>Templates not configured</h1>"
+
+    return templates.TemplateResponse(
+        "job.html",
+        {
+            "request": request,
+            "job_id": job_id,
+            "job": jobs_db[job_id],
+        },
+    )
+
+
 @app.post("/api/v1/upload", response_model=JobResponse)
 async def upload_audio(
     background_tasks: BackgroundTasks,
@@ -726,7 +938,6 @@ async def upload_audio(
 ):
     """
     Step 1: Upload audio file
-    Returns job_id and starts diagnostic
     """
     
     # Validate file type
@@ -736,6 +947,11 @@ async def upload_audio(
     if file_ext not in allowed_extensions:
         raise HTTPException(400, f"Unsupported file type: {file_ext}")
     
+    # CRITICAL FIX #6: Validate file size early
+    file_content = await file.read()
+    file_size = len(file_content)
+    validate_file_size(file_size)
+    
     # Generate job ID
     job_id = str(uuid.uuid4())
     
@@ -744,17 +960,23 @@ async def upload_audio(
     
     try:
         with open(upload_path, "wb") as buffer:
-            shutil.copyfileobj(file.file, buffer)
+            buffer.write(file_content)
     except Exception as e:
         raise HTTPException(500, f"Failed to save file: {e}")
+    finally:
+        # Clear file from memory
+        file_content = None
     
-    # Create job
+    # Create job record
     jobs_db[job_id] = {
         'job_id': job_id,
         'status': JobStatus.UPLOADED,
         'created_at': datetime.utcnow().isoformat(),
         'filename': file.filename,
+        'progress': 10,
+        'progress_message': 'Uploaded. Ready to diagnose.',
         'file_path': str(upload_path),
+        'file_size': file_size,
         'diagnostic_report': None,
         'separated_files': None,
         'cleaned_files': None,
@@ -770,7 +992,6 @@ async def upload_audio(
 async def get_diagnostic(job_id: str):
     """
     Step 2: Get diagnostic report
-    Analyzes audio and provides recommendations
     """
     
     if job_id not in jobs_db:
@@ -781,14 +1002,17 @@ async def get_diagnostic(job_id: str):
     # Run diagnostic if not done
     if not job['diagnostic_report']:
         try:
+            _set_job_progress(job_id, 15, "Diagnosing audio…")
             audio_path = Path(job['file_path'])
             diagnostic = await diagnose_audio(audio_path)
             
             jobs_db[job_id]['diagnostic_report'] = diagnostic.dict()
             jobs_db[job_id]['status'] = JobStatus.DIAGNOSED
+            _set_job_progress(job_id, 25, "Diagnosis complete.")
             
         except Exception as e:
             jobs_db[job_id]['error'] = f"Diagnostic failed: {str(e)}"
+            _set_job_progress(job_id, 100, "Failed.")
             raise HTTPException(500, f"Diagnostic failed: {e}")
     
     return JobResponse(**jobs_db[job_id])
@@ -802,7 +1026,6 @@ async def proceed_with_separation(
 ):
     """
     Step 3: User confirms and starts separation
-    User can adjust num_speakers and method
     """
     
     if job_id not in jobs_db:
@@ -826,6 +1049,7 @@ async def proceed_with_separation(
     }
     
     # Start separation in background
+    _set_job_progress(job_id, 30, "Queued for separation…")
     background_tasks.add_task(
         process_separation_task,
         job_id,
@@ -839,17 +1063,59 @@ async def proceed_with_separation(
     return JobResponse(**jobs_db[job_id])
 
 
-@app.get("/api/v1/jobs/{job_id}", response_model=JobResponse)
+@app.get("/api/v1/jobs/{job_id}")
 async def get_job_status(job_id: str):
     """
     Step 4: Get job status
-    Poll this to check progress
     """
     
     if job_id not in jobs_db:
         raise HTTPException(404, "Job not found")
     
     return JobResponse(**jobs_db[job_id])
+
+
+@app.get("/api/v1/jobs/{job_id}/stream")
+async def stream_job_status(job_id: str):
+    """
+    Real-time job status using Server-Sent Events (SSE)
+    """
+    if job_id not in jobs_db:
+        raise HTTPException(404, "Job not found")
+    
+    async def event_generator():
+        """Stream job status updates"""
+        last_progress = -1
+        last_status = None
+        
+        while True:
+            job = jobs_db.get(job_id)
+            if not job:
+                break
+            
+            progress = job.get('progress', 0)
+            status = job.get('status')
+            message = job.get('progress_message', '')
+            
+            if progress != last_progress or status != last_status:
+                yield f"data: {json.dumps({'progress': progress, 'status': status, 'message': message})}\n\n"
+                last_progress = progress
+                last_status = status
+            
+            if status in [JobStatus.COMPLETED, JobStatus.SEPARATED, JobStatus.FAILED]:
+                yield f"data: {json.dumps(jobs_db[job_id])}\n\n"
+                break
+            
+            await asyncio.sleep(0.5)
+    
+    return StreamingResponse(
+        event_generator(),
+        media_type="text/event-stream",
+        headers={
+            "Cache-Control": "no-cache",
+            "Connection": "keep-alive"
+        }
+    )
 
 
 @app.post("/api/v1/jobs/{job_id}/clean", response_model=JobResponse)
@@ -860,7 +1126,6 @@ async def clean_separated_files(
 ):
     """
     Step 5: Clean separated audio files
-    Removes silence, noise, clicks, normalizes
     """
     
     if job_id not in jobs_db:
@@ -884,10 +1149,9 @@ async def clean_separated_files(
 
 
 @app.get("/api/v1/download/{job_id}/{file_type}/{filename}")
-async def download_file(job_id: str, file_type: str, filename: str):
+async def download_file(job_id: str, file_type: str, filename: str, inline: bool = Query(False)):
     """
     Step 6: Download files
-    file_type: 'separated' or 'cleaned'
     """
     
     if job_id not in jobs_db:
@@ -909,7 +1173,6 @@ async def download_file(job_id: str, file_type: str, filename: str):
 async def submit_feedback(job_id: str, feedback: UserFeedback):
     """
     Step 7: Submit user feedback
-    Gets Ollama's analysis and suggestions
     """
     
     if job_id not in jobs_db:
@@ -948,12 +1211,13 @@ async def delete_job(job_id: str):
     if job_id not in jobs_db:
         raise HTTPException(404, "Job not found")
     
-    # Delete files
+    # Delete uploaded file
     for ext in ['.mp3', '.wav', '.flac', '.ogg', '.m4a']:
         upload_path = UPLOAD_DIR / f"{job_id}{ext}"
         if upload_path.exists():
             upload_path.unlink()
     
+    # Delete output directory
     output_path = OUTPUT_DIR / job_id
     if output_path.exists():
         shutil.rmtree(output_path)
