@@ -1,0 +1,927 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Speaker Separation - Complete Workflow</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            padding: 2rem;
+        }
+        
+        .container {
+            max-width: 1000px;
+            margin: 0 auto;
+            background: white;
+            border-radius: 20px;
+            padding: 2rem;
+            box-shadow: 0 20px 60px rgba(0,0,0,0.3);
+        }
+        
+        h1 {
+            color: #667eea;
+            margin-bottom: 0.5rem;
+        }
+        
+        .workflow-steps {
+            display: flex;
+            justify-content: space-between;
+            margin: 2rem 0;
+            position: relative;
+        }
+        
+        .workflow-steps::before {
+            content: '';
+            position: absolute;
+            top: 20px;
+            left: 0;
+            right: 0;
+            height: 2px;
+            background: #e0e0e0;
+            z-index: 0;
+        }
+        
+        .step {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            position: relative;
+            z-index: 1;
+        }
+        
+        .step-number {
+            width: 40px;
+            height: 40px;
+            border-radius: 50%;
+            background: #e0e0e0;
+            color: #999;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: bold;
+            margin-bottom: 0.5rem;
+        }
+        
+        .step.active .step-number {
+            background: #667eea;
+            color: white;
+        }
+        
+        .step.completed .step-number {
+            background: #10b981;
+            color: white;
+        }
+        
+        .step-label {
+            font-size: 0.8rem;
+            color: #666;
+            text-align: center;
+        }
+        
+        .section {
+            display: none;
+            margin: 2rem 0;
+        }
+        
+        .section.active {
+            display: block;
+        }
+        
+        .upload-area {
+            border: 3px dashed #667eea;
+            border-radius: 10px;
+            padding: 3rem;
+            text-align: center;
+            cursor: pointer;
+            transition: all 0.3s;
+            background: #f8f9ff;
+        }
+        
+        .upload-area:hover {
+            background: #eef1ff;
+            border-color: #764ba2;
+        }
+        
+        .upload-area.drag-over {
+            background: #e0e7ff;
+            border-color: #764ba2;
+        }
+        
+        input[type="file"] {
+            display: none;
+        }
+        
+        button {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            border: none;
+            padding: 0.75rem 2rem;
+            border-radius: 8px;
+            font-size: 1rem;
+            font-weight: 600;
+            cursor: pointer;
+            transition: transform 0.2s;
+            margin: 0.5rem;
+        }
+        
+        button:hover:not(:disabled) {
+            transform: translateY(-2px);
+        }
+        
+        button:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+        }
+        
+        button.secondary {
+            background: #6b7280;
+        }
+        
+        .diagnostic-report {
+            background: #f8f9ff;
+            padding: 1.5rem;
+            border-radius: 10px;
+            margin: 1rem 0;
+        }
+        
+        .metric {
+            display: flex;
+            justify-content: space-between;
+            padding: 0.5rem 0;
+            border-bottom: 1px solid #e0e0e0;
+        }
+        
+        .metric:last-child {
+            border-bottom: none;
+        }
+        
+        .metric-label {
+            font-weight: 600;
+            color: #666;
+        }
+        
+        .metric-value {
+            color: #333;
+        }
+        
+        .quality-excellent { color: #10b981; }
+        .quality-good { color: #f59e0b; }
+        .quality-poor { color: #ef4444; }
+        
+        .issues {
+            background: #fee2e2;
+            border-left: 4px solid #ef4444;
+            padding: 1rem;
+            margin: 1rem 0;
+            border-radius: 4px;
+        }
+        
+        .recommendations {
+            background: #dbeafe;
+            border-left: 4px solid #3b82f6;
+            padding: 1rem;
+            margin: 1rem 0;
+            border-radius: 4px;
+        }
+        
+        .ollama-analysis {
+            background: #fef3c7;
+            border-left: 4px solid #f59e0b;
+            padding: 1rem;
+            margin: 1rem 0;
+            border-radius: 4px;
+        }
+        
+        .file-list {
+            margin: 1rem 0;
+        }
+        
+        .file-item {
+            background: #f8f9ff;
+            padding: 1rem;
+            margin: 0.5rem 0;
+            border-radius: 8px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        
+        .download-btn {
+            background: #10b981;
+            padding: 0.5rem 1rem;
+            color: white;
+            text-decoration: none;
+            border-radius: 6px;
+            font-size: 0.9rem;
+        }
+        
+        .download-btn:hover {
+            background: #059669;
+        }
+        
+        .progress {
+            display: none;
+            margin: 2rem 0;
+        }
+        
+        .progress.active {
+            display: block;
+        }
+        
+        .progress-bar {
+            width: 100%;
+            height: 8px;
+            background: #e0e0e0;
+            border-radius: 4px;
+            overflow: hidden;
+        }
+        
+        .progress-fill {
+            height: 100%;
+            background: linear-gradient(90deg, #667eea 0%, #764ba2 100%);
+            transition: width 0.3s;
+            animation: pulse 1.5s ease-in-out infinite;
+        }
+        
+        @keyframes pulse {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.7; }
+        }
+        
+        .status {
+            margin-top: 1rem;
+            padding: 1rem;
+            border-radius: 8px;
+            background: #f0f0f0;
+            text-align: center;
+        }
+        
+        select, input[type="number"] {
+            padding: 0.75rem;
+            border: 2px solid #e0e0e0;
+            border-radius: 8px;
+            font-size: 1rem;
+            margin: 0.5rem;
+        }
+        
+        .config-options {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 1rem;
+            margin: 1rem 0;
+        }
+        
+        .checkbox-group {
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+            margin: 0.5rem 0;
+        }
+        
+        textarea {
+            width: 100%;
+            padding: 1rem;
+            border: 2px solid #e0e0e0;
+            border-radius: 8px;
+            font-family: inherit;
+            font-size: 1rem;
+            min-height: 100px;
+            resize: vertical;
+        }
+        
+        .rating {
+            display: flex;
+            gap: 0.5rem;
+            justify-content: center;
+            margin: 1rem 0;
+        }
+        
+        .star {
+            font-size: 2rem;
+            cursor: pointer;
+            color: #e0e0e0;
+            transition: color 0.2s;
+        }
+        
+        .star:hover, .star.active {
+            color: #fbbf24;
+        }
+        
+        .error {
+            background: #fee2e2;
+            color: #991b1b;
+            padding: 1rem;
+            border-radius: 8px;
+            margin: 1rem 0;
+        }
+        
+        .debug-info {
+            background: #f3f4f6;
+            padding: 1rem;
+            margin: 1rem 0;
+            border-radius: 8px;
+            font-family: monospace;
+            font-size: 0.85rem;
+            max-height: 200px;
+            overflow-y: auto;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🎤 Speaker Separation System</h1>
+        <p class="subtitle">Complete workflow with AI assistance</p>
+        
+        <!-- Workflow Steps -->
+        <div class="workflow-steps">
+            <div class="step" id="step-1">
+                <div class="step-number">1</div>
+                <div class="step-label">Upload</div>
+            </div>
+            <div class="step" id="step-2">
+                <div class="step-number">2</div>
+                <div class="step-label">Diagnose</div>
+            </div>
+            <div class="step" id="step-3">
+                <div class="step-number">3</div>
+                <div class="step-label">Separate</div>
+            </div>
+            <div class="step" id="step-4">
+                <div class="step-number">4</div>
+                <div class="step-label">Download</div>
+            </div>
+            <div class="step" id="step-5">
+                <div class="step-number">5</div>
+                <div class="step-label">Clean</div>
+            </div>
+            <div class="step" id="step-6">
+                <div class="step-number">6</div>
+                <div class="step-label">Feedback</div>
+            </div>
+        </div>
+        
+        <!-- Debug info -->
+        <div id="debugInfo" class="debug-info" style="display: none;"></div>
+        
+        <!-- Section 1: Upload -->
+        <div class="section active" id="section-upload">
+            <h2>Step 1: Upload Audio File</h2>
+            <div class="upload-area" id="uploadArea">
+                <input type="file" id="fileInput" accept="audio/*">
+                <div>
+                    <h2>📁 Drop your audio file here</h2>
+                    <p>or click to browse</p>
+                    <p style="color: #999; margin-top: 1rem;">Supported: MP3, WAV, FLAC, OGG, M4A</p>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Section 2: Diagnostic -->
+        <div class="section" id="section-diagnostic">
+            <h2>Step 2: Diagnostic Report</h2>
+            <div id="diagnosticReport"></div>
+            <div class="config-options">
+                <div>
+                    <label>Number of Speakers:</label>
+                    <input type="number" id="numSpeakers" min="2" max="10" value="2">
+                </div>
+                <div>
+                    <label>Method:</label>
+                    <select id="method">
+                        <option value="gmm">GMM (Recommended)</option>
+                        <option value="kmeans">K-means (Fast)</option>
+                        <option value="spectral">Spectral (Advanced)</option>
+                    </select>
+                </div>
+            </div>
+            <button onclick="proceedWithSeparation()">✓ Proceed with Separation</button>
+            <button class="secondary" onclick="cancelJob()">✗ Cancel</button>
+        </div>
+        
+        <!-- Section 3: Separation Progress -->
+        <div class="section" id="section-separating">
+            <h2>Step 3: Separating Speakers</h2>
+            <div class="progress active">
+                <div class="progress-bar">
+                    <div class="progress-fill" style="width: 100%"></div>
+                </div>
+                <div class="status" id="separationStatus">Processing audio...</div>
+            </div>
+        </div>
+        
+        <!-- Section 4: Download Separated Files -->
+        <div class="section" id="section-download">
+            <h2>Step 4: Download Separated Files</h2>
+            <p>Your audio has been separated into individual speakers:</p>
+            <div class="file-list" id="separatedFiles"></div>
+            <button onclick="showCleaningSection()">🧹 Clean These Files</button>
+            <button class="secondary" onclick="skipToFeedback()">Skip to Feedback</button>
+        </div>
+        
+        <!-- Section 5: Cleaning -->
+        <div class="section" id="section-cleaning">
+            <h2>Step 5: Clean Audio Files</h2>
+            <p>Select cleaning options:</p>
+            <div class="checkbox-group">
+                <input type="checkbox" id="removeSilence" checked>
+                <label for="removeSilence">Remove silence (30-50% shorter)</label>
+            </div>
+            <div class="checkbox-group">
+                <input type="checkbox" id="reduceNoise" checked>
+                <label for="reduceNoise">Reduce background noise</label>
+            </div>
+            <div class="checkbox-group">
+                <input type="checkbox" id="removeClicks" checked>
+                <label for="removeClicks">Remove clicks and pops</label>
+            </div>
+            <div class="checkbox-group">
+                <input type="checkbox" id="normalize" checked>
+                <label for="normalize">Normalize volume</label>
+            </div>
+            <button onclick="startCleaning()">🧹 Start Cleaning</button>
+            
+            <div class="progress" id="cleaningProgress">
+                <div class="progress-bar">
+                    <div class="progress-fill" style="width: 100%"></div>
+                </div>
+                <div class="status" id="cleaningStatus">Cleaning audio...</div>
+            </div>
+            
+            <div class="file-list" id="cleanedFiles" style="display: none;"></div>
+        </div>
+        
+        <!-- Section 6: Feedback -->
+        <div class="section" id="section-feedback">
+            <h2>Step 6: How did we do?</h2>
+            <p>Rate your experience:</p>
+            <div class="rating" id="rating">
+                <span class="star" data-rating="1">★</span>
+                <span class="star" data-rating="2">★</span>
+                <span class="star" data-rating="3">★</span>
+                <span class="star" data-rating="4">★</span>
+                <span class="star" data-rating="5">★</span>
+            </div>
+            <textarea id="feedbackText" placeholder="Tell us about your experience, any issues, or suggestions..."></textarea>
+            <button onclick="submitFeedback()">Submit Feedback</button>
+            <div id="ollamaFeedbackResponse" style="display: none;"></div>
+        </div>
+    </div>
+
+    <script>
+        const API_URL = 'http://localhost:8000';
+        let currentJobId = null;
+        let currentStep = 1;
+        let selectedRating = 0;
+        let debugMode = true;  // Enable debug logging
+        
+        function log(message, data = null) {
+            if (debugMode) {
+                console.log(message, data);
+                const debugDiv = document.getElementById('debugInfo');
+                debugDiv.style.display = 'block';
+                const timestamp = new Date().toLocaleTimeString();
+                debugDiv.innerHTML += `[${timestamp}] ${message}<br>`;
+                if (data) {
+                    debugDiv.innerHTML += `<pre>${JSON.stringify(data, null, 2)}</pre>`;
+                }
+                debugDiv.scrollTop = debugDiv.scrollHeight;
+            }
+        }
+        
+        // Upload handlers
+        const uploadArea = document.getElementById('uploadArea');
+        const fileInput = document.getElementById('fileInput');
+        
+        uploadArea.addEventListener('click', () => fileInput.click());
+        
+        uploadArea.addEventListener('dragover', (e) => {
+            e.preventDefault();
+            uploadArea.classList.add('drag-over');
+        });
+        
+        uploadArea.addEventListener('dragleave', () => {
+            uploadArea.classList.remove('drag-over');
+        });
+        
+        uploadArea.addEventListener('drop', (e) => {
+            e.preventDefault();
+            uploadArea.classList.remove('drag-over');
+            if (e.dataTransfer.files.length > 0) {
+                handleFile(e.dataTransfer.files[0]);
+            }
+        });
+        
+        fileInput.addEventListener('change', (e) => {
+            if (e.target.files.length > 0) {
+                handleFile(e.target.files[0]);
+            }
+        });
+        
+        async function handleFile(file) {
+            log('Uploading file', {name: file.name, size: file.size});
+            
+            uploadArea.innerHTML = `
+                <h2>⏳ Uploading ${file.name}</h2>
+                <p>Please wait...</p>
+            `;
+            
+            const formData = new FormData();
+            formData.append('file', file);
+            
+            try {
+                const response = await fetch(`${API_URL}/api/v1/upload`, {
+                    method: 'POST',
+                    body: formData
+                });
+                
+                if (!response.ok) throw new Error('Upload failed');
+                
+                const job = await response.json();
+                currentJobId = job.job_id;
+                
+                log('Upload successful', job);
+                
+                // Move to diagnostic step
+                await getDiagnostic();
+                
+            } catch (error) {
+                log('Upload error', error);
+                uploadArea.innerHTML = `
+                    <div class="error">Upload failed: ${error.message}</div>
+                    <button onclick="location.reload()">Try Again</button>
+                `;
+            }
+        }
+        
+        async function getDiagnostic() {
+            goToStep(2);
+            document.getElementById('diagnosticReport').innerHTML = '<p>⏳ Analyzing audio...</p>';
+            
+            try {
+                const response = await fetch(`${API_URL}/api/v1/jobs/${currentJobId}/diagnose`);
+                const job = await response.json();
+                
+                log('Diagnostic received', job);
+                
+                const report = job.diagnostic_report;
+                
+                // Set defaults
+                document.getElementById('numSpeakers').value = report.estimated_speakers;
+                
+                // Display report
+                let html = `
+                    <div class="diagnostic-report">
+                        <h3>Audio Analysis</h3>
+                        <div class="metric">
+                            <span class="metric-label">Duration</span>
+                            <span class="metric-value">${report.duration.toFixed(1)}s</span>
+                        </div>
+                        <div class="metric">
+                            <span class="metric-label">Speaking Time</span>
+                            <span class="metric-value">${report.speaking_time.toFixed(1)}s</span>
+                        </div>
+                        <div class="metric">
+                            <span class="metric-label">Estimated Speakers</span>
+                            <span class="metric-value">${report.estimated_speakers}</span>
+                        </div>
+                        <div class="metric">
+                            <span class="metric-label">Mean Pitch</span>
+                            <span class="metric-value">${report.mean_pitch.toFixed(0)} Hz</span>
+                        </div>
+                        <div class="metric">
+                            <span class="metric-label">Audio Quality</span>
+                            <span class="metric-value quality-${report.audio_quality}">${report.audio_quality.toUpperCase()}</span>
+                        </div>
+                    </div>
+                `;
+                
+                if (report.issues && report.issues.length > 0) {
+                    html += `
+                        <div class="issues">
+                            <h4>⚠️ Issues Detected:</h4>
+                            <ul>
+                                ${report.issues.map(issue => `<li>${issue}</li>`).join('')}
+                            </ul>
+                        </div>
+                    `;
+                }
+                
+                if (report.recommendations && report.recommendations.length > 0) {
+                    html += `
+                        <div class="recommendations">
+                            <h4>💡 Recommendations:</h4>
+                            <ul>
+                                ${report.recommendations.map(rec => `<li>${rec}</li>`).join('')}
+                            </ul>
+                        </div>
+                    `;
+                }
+                
+                if (report.ollama_analysis) {
+                    html += `
+                        <div class="ollama-analysis">
+                            <h4>🤖 AI Analysis:</h4>
+                            <p>${report.ollama_analysis}</p>
+                        </div>
+                    `;
+                }
+                
+                document.getElementById('diagnosticReport').innerHTML = html;
+                
+            } catch (error) {
+                log('Diagnostic error', error);
+                document.getElementById('diagnosticReport').innerHTML = `
+                    <div class="error">Failed to get diagnostic: ${error.message}</div>
+                `;
+            }
+        }
+        
+        async function proceedWithSeparation() {
+            const numSpeakers = parseInt(document.getElementById('numSpeakers').value);
+            const method = document.getElementById('method').value;
+            
+            log('Starting separation', {numSpeakers, method});
+            
+            try {
+                const response = await fetch(`${API_URL}/api/v1/jobs/${currentJobId}/proceed`, {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({
+                        action: 'proceed',
+                        num_speakers: numSpeakers,
+                        method: method
+                    })
+                });
+                
+                if (!response.ok) throw new Error('Failed to start separation');
+                
+                const job = await response.json();
+                log('Separation started', job);
+                
+                goToStep(3);
+                pollSeparationStatus();
+                
+            } catch (error) {
+                log('Separation start error', error);
+                alert(`Error: ${error.message}`);
+            }
+        }
+        
+        async function pollSeparationStatus() {
+            const interval = setInterval(async () => {
+                try {
+                    const response = await fetch(`${API_URL}/api/v1/jobs/${currentJobId}`);
+                    const job = await response.json();
+                    
+                    log('Poll status', {status: job.status});
+                    
+                    document.getElementById('separationStatus').textContent = 
+                        `Status: ${job.status}...`;
+                    
+                    if (job.status === 'separated') {
+                        clearInterval(interval);
+                        log('Separation complete', job);
+                        displaySeparatedFiles(job);
+                    } else if (job.status === 'failed') {
+                        clearInterval(interval);
+                        log('Separation failed', job);
+                        document.getElementById('separationStatus').innerHTML = 
+                            `<div class="error">Separation failed: ${job.error || 'Unknown error'}</div>`;
+                    }
+                } catch (error) {
+                    log('Poll error', error);
+                    clearInterval(interval);
+                    document.getElementById('separationStatus').innerHTML = 
+                        `<div class="error">Error checking status: ${error.message}</div>`;
+                }
+            }, 2000);
+        }
+        
+        function displaySeparatedFiles(job) {
+            log('Displaying separated files', job);
+            
+            goToStep(4);
+            
+            // Check if separated_files exists and has data
+            if (!job.separated_files || Object.keys(job.separated_files).length === 0) {
+                document.getElementById('separatedFiles').innerHTML = `
+                    <div class="error">
+                        <p>No separated files found in response.</p>
+                        <p>Debug info: ${JSON.stringify(job, null, 2)}</p>
+                        <button onclick="location.reload()">Start Over</button>
+                    </div>
+                `;
+                return;
+            }
+            
+            let html = '';
+            for (const [speaker, url] of Object.entries(job.separated_files)) {
+                html += `
+                    <div class="file-item">
+                        <span>🎤 ${speaker}.wav</span>
+                        <a href="${API_URL}${url}" class="download-btn" download>⬇️ Download</a>
+                    </div>
+                `;
+            }
+            
+            document.getElementById('separatedFiles').innerHTML = html;
+        }
+        
+        function showCleaningSection() {
+            goToStep(5);
+        }
+        
+        async function startCleaning() {
+            document.getElementById('cleaningProgress').classList.add('active');
+            
+            const config = {
+                remove_silence: document.getElementById('removeSilence').checked,
+                reduce_noise: document.getElementById('reduceNoise').checked,
+                remove_clicks: document.getElementById('removeClicks').checked,
+                normalize: document.getElementById('normalize').checked
+            };
+            
+            log('Starting cleaning', config);
+            
+            try {
+                const response = await fetch(`${API_URL}/api/v1/jobs/${currentJobId}/clean`, {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify(config)
+                });
+                
+                if (!response.ok) throw new Error('Cleaning failed');
+                
+                log('Cleaning started');
+                pollCleaningStatus();
+                
+            } catch (error) {
+                log('Cleaning error', error);
+                document.getElementById('cleaningStatus').innerHTML = 
+                    `<div class="error">Error: ${error.message}</div>`;
+            }
+        }
+        
+        async function pollCleaningStatus() {
+            const interval = setInterval(async () => {
+                try {
+                    const response = await fetch(`${API_URL}/api/v1/jobs/${currentJobId}`);
+                    const job = await response.json();
+                    
+                    log('Cleaning status', {status: job.status});
+                    
+                    document.getElementById('cleaningStatus').textContent = 
+                        `Status: ${job.status}...`;
+                    
+                    if (job.status === 'completed') {
+                        clearInterval(interval);
+                        log('Cleaning complete', job);
+                        displayCleanedFiles(job);
+                    } else if (job.status === 'failed') {
+                        clearInterval(interval);
+                        log('Cleaning failed', job);
+                        document.getElementById('cleaningStatus').innerHTML = 
+                            `<div class="error">Cleaning failed: ${job.error || 'Unknown error'}</div>`;
+                    }
+                } catch (error) {
+                    log('Cleaning poll error', error);
+                    clearInterval(interval);
+                }
+            }, 2000);
+        }
+        
+        function displayCleanedFiles(job) {
+            document.getElementById('cleaningProgress').classList.remove('active');
+            
+            let html = '<h3>✨ Cleaned Files Ready!</h3>';
+            
+            if (job.cleaned_files && Object.keys(job.cleaned_files).length > 0) {
+                for (const [speaker, url] of Object.entries(job.cleaned_files)) {
+                    html += `
+                        <div class="file-item">
+                            <span>✨ ${speaker}.wav</span>
+                            <a href="${API_URL}${url}" class="download-btn" download>⬇️ Download</a>
+                        </div>
+                    `;
+                }
+            } else {
+                html += '<p class="error">No cleaned files available</p>';
+            }
+            
+            html += '<button onclick="goToStep(6)">Continue to Feedback →</button>';
+            
+            document.getElementById('cleanedFiles').innerHTML = html;
+            document.getElementById('cleanedFiles').style.display = 'block';
+        }
+        
+        function skipToFeedback() {
+            goToStep(6);
+        }
+        
+        // Rating stars
+        document.querySelectorAll('.star').forEach(star => {
+            star.addEventListener('click', function() {
+                selectedRating = parseInt(this.dataset.rating);
+                document.querySelectorAll('.star').forEach((s, i) => {
+                    if (i < selectedRating) {
+                        s.classList.add('active');
+                    } else {
+                        s.classList.remove('active');
+                    }
+                });
+            });
+        });
+        
+        async function submitFeedback() {
+            const feedback = document.getElementById('feedbackText').value;
+            
+            if (!feedback && selectedRating === 0) {
+                alert('Please provide a rating or feedback');
+                return;
+            }
+            
+            log('Submitting feedback', {feedback, rating: selectedRating});
+            
+            try {
+                const response = await fetch(`${API_URL}/api/v1/jobs/${currentJobId}/feedback`, {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({
+                        feedback: feedback,
+                        rating: selectedRating
+                    })
+                });
+                
+                const job = await response.json();
+                log('Feedback submitted', job);
+                
+                if (job.ollama_feedback_response) {
+                    const responseDiv = document.getElementById('ollamaFeedbackResponse');
+                    responseDiv.innerHTML = `
+                        <div class="ollama-analysis" style="margin-top: 1rem;">
+                            <h4>🤖 AI Response to Your Feedback:</h4>
+                            <p>${job.ollama_feedback_response}</p>
+                        </div>
+                        <button onclick="location.reload()">Process Another File</button>
+                    `;
+                    responseDiv.style.display = 'block';
+                }
+                
+            } catch (error) {
+                log('Feedback error', error);
+                alert(`Error submitting feedback: ${error.message}`);
+            }
+        }
+        
+        function cancelJob() {
+            if (confirm('Are you sure you want to cancel?')) {
+                location.reload();
+            }
+        }
+        
+        function goToStep(step) {
+            currentStep = step;
+            log(`Moving to step ${step}`);
+            
+            // Update step indicators
+            for (let i = 1; i <= 6; i++) {
+                const stepEl = document.getElementById(`step-${i}`);
+                if (i < step) {
+                    stepEl.classList.add('completed');
+                    stepEl.classList.remove('active');
+                } else if (i === step) {
+                    stepEl.classList.add('active');
+                    stepEl.classList.remove('completed');
+                } else {
+                    stepEl.classList.remove('active', 'completed');
+                }
+            }
+            
+            // Show appropriate section
+            document.querySelectorAll('.section').forEach(section => {
+                section.classList.remove('active');
+            });
+            
+            const sectionMap = {
+                1: 'upload',
+                2: 'diagnostic',
+                3: 'separating',
+                4: 'download',
+                5: 'cleaning',
+                6: 'feedback'
+            };
+            
+            document.getElementById(`section-${sectionMap[step]}`).classList.add('active');
+        }
+    </script>
+</body>
+</html>
