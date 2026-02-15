@@ -886,11 +886,17 @@ async def ui_upload_audio(request: Request, file: UploadFile = File(...)):
     job_id = str(uuid.uuid4())
     upload_path = UPLOAD_DIR / f"{job_id}{file_ext}"
 
+    file_content = await file.read()
+    file_size = len(file_content)
+    validate_file_size(file_size)
+
     try:
         with open(upload_path, "wb") as buffer:
-            shutil.copyfileobj(file.file, buffer)
+            buffer.write(file_content)
     except Exception as e:
         raise HTTPException(500, f"Failed to save file: {e}")
+    finally:
+        file_content = None
 
     jobs_db[job_id] = {
         'job_id': job_id,
