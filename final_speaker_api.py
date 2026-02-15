@@ -168,11 +168,13 @@ except Exception as e:
     print("   Using inline implementation")
 
 try:
-    from audio_cleaner import AudioCleaner, clean_separated_speakers as clean_speakers_external
+    from audio_cleaner import AudioCleaner, clean_separated_speakers
+    clean_speakers_external = clean_separated_speakers
     CLEANER_AVAILABLE = True
     print("✓ Loaded AudioCleaner")
 except Exception as e:
     print(f"⚠️  Could not load audio_cleaner: {e}")
+    clean_speakers_external = None  # Fallback if import fails
     print("   Using inline implementation")
 
 # ============================================================================
