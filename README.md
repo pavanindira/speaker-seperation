@@ -283,6 +283,13 @@ while True:
     time.sleep(2)
 ```
 
+## Active Files (Production)
+   - `final_speaker_api.py` - Main API server
+   - `improved_speaker_separator.py` - Core separation logic
+   - `audio_cleaner.py` - Audio post-processing
+   - `config.py` - Configuration management
+   - `final_speaker_frontend.html` - Web UI
+
 ## Output Format
 
 ### Directory Structure
