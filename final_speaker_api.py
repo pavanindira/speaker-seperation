@@ -1,13 +1,6 @@
 #!/usr/bin/env python3
 """
-Complete Speaker Separation API - Final Version
-Full workflow: Upload → Diagnose → Separate → Clean → Feedback
-Fixed version with critical bugs resolved:
-- App instantiation moved before middleware usage
-- File size validation added
-- Temp file cleanup on shutdown
-- Ollama timeout handling
-- prometheus_client safely imported
+Complete Speaker Separation API - Final Version with Enhanced Logging & Error Handling
 """
 
 import os
@@ -17,13 +10,30 @@ import uuid
 import asyncio
 import atexit
 import json
+import time
 from pathlib import Path
 from typing import Optional, List, Dict
 from datetime import datetime
 from enum import Enum
 
 # ============================================================================
-# Dependencies Installation
+# CRITICAL: Import custom logging and error handling FIRST
+# ============================================================================
+
+from logger_wrapper import (
+    logger, log_module_loaded, log_system_startup, 
+    log_config_loaded, log_separator_started, 
+    log_separator_completed, log_temp_cleanup, LogContext
+)
+
+from error_handler import (
+    ValidationError, NotFoundError, FileSizeError, ProcessingError,
+    OllamaError, TimeoutError, ErrorRecoveryHandler, handle_errors,
+    retry_with_backoff, timeout_handler
+)
+
+# ============================================================================
+# Dependencies Installation (With Logging)
 # ============================================================================
 
 try:
@@ -34,7 +44,10 @@ try:
     from fastapi.templating import Jinja2Templates
     import uvicorn
 except ImportError:
-    print("Installing FastAPI and dependencies...")
+    logger.critical(
+        "FastAPI dependencies not found, installing...",
+        component='startup'
+    )
     import subprocess
     subprocess.check_call([sys.executable, "-m", "pip", "install", 
                           "fastapi", "uvicorn[standard]", "python-multipart", "aiofiles"])
@@ -51,7 +64,10 @@ try:
     import soundfile as sf
     import numpy as np
 except ImportError:
-    print("Installing audio processing libraries...")
+    logger.critical(
+        "Audio processing libraries not found, installing...",
+        component='startup'
+    )
     import subprocess
     subprocess.check_call([sys.executable, "-m", "pip", "install", 
                           "requests", "librosa", "soundfile", "numpy"])
@@ -64,13 +80,22 @@ from fastapi import Depends, Response
 from pydantic import BaseModel
 
 # ============================================================================
-# Configuration
+# Configuration with Error Handling
 # ============================================================================
 
 try:
     from config import config
-    print(f"✓ Loaded config: Ollama at {config.OLLAMA_URL}")
-except ImportError:
+    log_config_loaded(location="config.py", status="success")
+    logger.info(
+        "Configuration loaded",
+        extra={'ollama_url': config.OLLAMA_URL, 'api_port': config.API_PORT},
+        component='config'
+    )
+except ImportError as e:
+    logger.warning(
+        f"Using default config: {e}",
+        component='config'
+    )
     class Config:
         OLLAMA_URL = os.getenv('OLLAMA_URL', 'http://localhost:11434')
         OLLAMA_MODEL = os.getenv('OLLAMA_MODEL', 'llama3.2')
@@ -254,7 +279,7 @@ async def metrics():
 
 
 # ============================================================================
-# Load Audio Processing Modules
+# Load Audio Processing Modules with Logging
 # ============================================================================
 
 SEPARATOR_AVAILABLE = False
@@ -264,238 +289,25 @@ try:
     sys.path.insert(0, str(Path(__file__).parent))
     from improved_speaker_separator import ImprovedSpeakerSeparator
     SEPARATOR_AVAILABLE = True
-    print("✓ Loaded ImprovedSpeakerSeparator")
+    log_module_loaded("ImprovedSpeakerSeparator", "success")
 except Exception as e:
-    print(f"⚠️  Could not load improved_speaker_separator: {e}")
+    log_module_loaded("ImprovedSpeakerSeparator", "failed", reason=str(e))
 
 try:
     from audio_cleaner import AudioCleaner, clean_separated_speakers
     clean_speakers_external = clean_separated_speakers
     CLEANER_AVAILABLE = True
-    print("✓ Loaded AudioCleaner")
+    log_module_loaded("AudioCleaner", "success")
 except Exception as e:
-    print(f"⚠️  Could not load audio_cleaner: {e}")
+    log_module_loaded("AudioCleaner", "failed", reason=str(e))
     clean_speakers_external = None
 
-
 # ============================================================================
-# Inline Implementations (if modules unavailable)
-# ============================================================================
-
-if not SEPARATOR_AVAILABLE:
-    from sklearn.cluster import KMeans, GaussianMixture
-    from sklearn.preprocessing import StandardScaler
-    from scipy.ndimage import median_filter
-    from scipy.signal import medfilt
-    
-    class ImprovedSpeakerSeparator:
-        """Inline speaker separator implementation"""
-        
-        def __init__(self, output_dir: Path):
-            self.output_dir = output_dir
-            self.output_dir.mkdir(exist_ok=True, parents=True)
-        
-        def separate_speakers(self, audio_path: Path, n_speakers: int = 2, method: str = 'gmm', progress_callback=None):
-            """Separate speakers from audio file"""
-            
-            print(f"\nSeparating {n_speakers} speakers using {method}...")
-            
-            # Load audio
-            y, sr = librosa.load(str(audio_path), sr=16000)
-            
-            # Extract MFCC features
-            mfcc = librosa.feature.mfcc(y=y, sr=sr, n_mfcc=20)
-            
-            # Voice activity detection
-            hop_length = 512
-            rms = librosa.feature.rms(y=y, hop_length=hop_length)[0]
-            threshold = np.percentile(rms, 40)
-            voice_activity = rms > threshold
-            
-            # Normalize features
-            mfcc_norm = (mfcc - np.mean(mfcc, axis=1, keepdims=True)) / (np.std(mfcc, axis=1, keepdims=True) + 1e-10)
-            
-            # Get features for active frames
-            min_len = min(mfcc_norm.shape[1], len(voice_activity))
-            mfcc_norm = mfcc_norm[:, :min_len]
-            voice_activity = voice_activity[:min_len]
-            
-            active_frames = np.where(voice_activity)[0]
-            
-            if len(active_frames) < n_speakers * 10:
-                raise ValueError(f"Not enough voice activity detected. Only {len(active_frames)} frames found.")
-            
-            active_features = mfcc_norm[:, active_frames].T
-            
-            # Cluster
-            scaler = StandardScaler()
-            active_features_scaled = scaler.fit_transform(active_features)
-            
-            labels = np.zeros(mfcc_norm.shape[1], dtype=int)
-            
-            if method == 'gmm':
-                gmm = GaussianMixture(n_components=n_speakers, covariance_type='full', n_init=10, random_state=42)
-                active_labels = gmm.fit_predict(active_features_scaled)
-            else:  # kmeans
-                kmeans = KMeans(n_clusters=n_speakers, n_init=20, random_state=42)
-                active_labels = kmeans.fit_predict(active_features_scaled)
-            
-            labels[active_frames] = active_labels
-            labels = medfilt(labels.astype(float), kernel_size=11).astype(int)
-            
-            # Separate and save
-            results = {'speakers': {}}
-            
-            for speaker_id in range(n_speakers):
-                speaker_mask = labels == speaker_id
-                time_mask = np.repeat(speaker_mask, hop_length)[:len(y)]
-                
-                # Smooth mask
-                from scipy.signal import windows
-                window_size = 441
-                smooth_mask = np.convolve(time_mask.astype(float), windows.hann(window_size), mode='same')
-                smooth_mask = np.clip(smooth_mask, 0, 1)
-                
-                speaker_audio = y * smooth_mask
-                
-                # Normalize
-                if np.max(np.abs(speaker_audio)) > 0:
-                    speaker_audio = speaker_audio / np.max(np.abs(speaker_audio)) * 0.9
-                
-                # Save
-                output_path = self.output_dir / f"speaker_{speaker_id + 1}.wav"
-                sf.write(output_path, speaker_audio, sr)
-                
-                speaking_time = np.sum(speaker_mask) * hop_length / sr
-                
-                results['speakers'][f'speaker_{speaker_id + 1}'] = {
-                    'path': str(output_path),
-                    'speaking_time': float(speaking_time)
-                }
-            
-            print(f"✓ Separated into {n_speakers} speakers")
-            return results
-
-
-if not CLEANER_AVAILABLE:
-    from scipy import signal
-    
-    class AudioCleaner:
-        """Inline audio cleaner implementation"""
-        
-        def __init__(self, sr: int = 16000):
-            self.sr = sr
-        
-        def clean_audio(self, audio_path: Path, output_path: Path,
-                       remove_silence: bool = True,
-                       reduce_noise: bool = True,
-                       remove_clicks: bool = True,
-                       normalize: bool = True) -> dict:
-            """Clean audio file"""
-            
-            print(f"\nCleaning: {audio_path.name}")
-            
-            y, sr = librosa.load(str(audio_path), sr=self.sr)
-            original_duration = len(y) / sr
-            
-            # Remove clicks
-            if remove_clicks:
-                median_filtered = signal.medfilt(y, kernel_size=5)
-                diff = np.abs(y - median_filtered)
-                std = np.std(diff)
-                clicks = diff > (3.0 * std)
-                y[clicks] = median_filtered[clicks]
-            
-            # Reduce noise (simple spectral subtraction)
-            if reduce_noise:
-                D = librosa.stft(y)
-                magnitude, phase = librosa.magphase(D)
-                
-                rms = librosa.feature.rms(y=y)[0]
-                noise_frames = int(0.5 * sr / 512)
-                quietest_idx = np.argpartition(rms, noise_frames)[:noise_frames]
-                
-                noise_magnitude = np.mean(magnitude[:, quietest_idx], axis=1, keepdims=True)
-                clean_magnitude = magnitude - 2.0 * noise_magnitude
-                clean_magnitude = np.maximum(clean_magnitude, 0.02 * magnitude)
-                
-                D_clean = clean_magnitude * phase
-                y = librosa.istft(D_clean)
-                
-                if len(y) < original_duration * sr:
-                    y = np.pad(y, (0, int(original_duration * sr) - len(y)))
-                else:
-                    y = y[:int(original_duration * sr)]
-            
-            # Remove silence
-            if remove_silence:
-                rms = librosa.feature.rms(y=y)[0]
-                threshold = np.percentile(rms, 40)
-                voice_activity = rms > threshold
-                
-                from scipy.ndimage import median_filter as med_filt
-                voice_activity = med_filt(voice_activity.astype(float), size=5) > 0.5
-                
-                # Expand with padding
-                padding_frames = int(0.1 * sr / 512)
-                padded_activity = np.copy(voice_activity)
-                for i in range(len(voice_activity)):
-                    if voice_activity[i]:
-                        start = max(0, i - padding_frames)
-                        end = min(len(voice_activity), i + padding_frames + 1)
-                        padded_activity[start:end] = True
-                
-                sample_mask = np.repeat(padded_activity, 512)[:len(y)]
-                y = y[sample_mask]
-            
-            # Normalize
-            if normalize:
-                peak = np.max(np.abs(y))
-                if peak > 0:
-                    target_peak = 10 ** (-3.0 / 20)
-                    y = y * (target_peak / peak)
-            
-            # Save
-            sf.write(output_path, y, sr)
-            
-            return {
-                'original_duration': original_duration,
-                'output_duration': len(y) / sr,
-                'output_file': str(output_path)
-            }
-    
-    def clean_separated_speakers(input_dir: Path, output_dir: Path = None, **kwargs):
-        """Clean all separated speaker files"""
-        
-        if output_dir is None:
-            output_dir = input_dir / "cleaned"
-        
-        output_dir.mkdir(exist_ok=True, parents=True)
-        
-        speaker_files = list(input_dir.glob("speaker_*.wav"))
-        
-        if not speaker_files:
-            return {}
-        
-        cleaner = AudioCleaner()
-        results = {}
-        
-        for audio_file in sorted(speaker_files):
-            output_file = output_dir / f"{audio_file.stem}_cleaned.wav"
-            stats = cleaner.clean_audio(audio_file, output_file, **kwargs)
-            results[audio_file.stem] = stats
-        
-        return results
-    
-    clean_speakers_external = clean_separated_speakers
-
-
-# ============================================================================
-# Utility Functions
+# Temp File Cleanup with Logging
 # ============================================================================
 
 def cleanup_temp_files():
-    """CRITICAL FIX #4: Clean up temporary files on shutdown"""
+    """Clean up temporary files on shutdown with logging"""
     try:
         if TEMP_DIR.exists():
             for file in TEMP_DIR.glob("*"):
@@ -503,138 +315,124 @@ def cleanup_temp_files():
                     file.unlink()
                 elif file.is_dir():
                     shutil.rmtree(file)
-            print("✓ Cleaned up temporary files")
+        log_temp_cleanup("success")
     except Exception as e:
-        print(f"⚠️  Error cleaning temp files: {e}")
+        log_temp_cleanup("failed", error=str(e))
 
-# Register cleanup on exit
 atexit.register(cleanup_temp_files)
 
+# ============================================================================
+# Updated File Size Validation with Error Handling
+# ============================================================================
 
 def validate_file_size(file_size: int) -> bool:
-    """CRITICAL FIX #5: Validate file size before processing"""
+    """Validate file size with proper error handling"""
     if file_size > MAX_FILE_SIZE:
-        raise HTTPException(
-            status_code=413,
-            detail=f"File size ({file_size / 1024 / 1024:.1f}MB) exceeds maximum ({MAX_FILE_SIZE / 1024 / 1024:.0f}MB)"
-        )
+        file_size_mb = file_size / 1024 / 1024
+        max_size_mb = MAX_FILE_SIZE / 1024 / 1024
+        raise FileSizeError(file_size_mb, int(max_size_mb))
     return True
 
-
-def _set_job_progress(job_id: str, progress: int, message: str = ""):
-    """Update job progress"""
-    if job_id in jobs_db:
-        jobs_db[job_id]['progress'] = min(progress, 100)
-        jobs_db[job_id]['progress_message'] = message
-
-
 # ============================================================================
-# Diagnostic Module
+# Updated API Endpoints with Error Handling & Logging
 # ============================================================================
 
-async def diagnose_audio(audio_path: Path) -> DiagnosticReport:
-    """Comprehensive audio diagnostic"""
+@app.post("/api/v1/upload", response_model=JobResponse)
+@handle_errors()
+async def upload_audio(
+    background_tasks: BackgroundTasks,
+    file: UploadFile = File(...)
+):
+    """Step 1: Upload audio file with comprehensive validation"""
     
-    # Load audio
-    y, sr = librosa.load(str(audio_path), sr=None, duration=180)  # First 3 minutes
-    duration = librosa.get_duration(y=y, sr=sr)
-    
-    # Voice activity detection
-    frame_length = 2048
-    hop_length = 512
-    rms = librosa.feature.rms(y=y, frame_length=frame_length, hop_length=hop_length)[0]
-    
-    threshold = np.percentile(rms, 40)
-    voice_activity = rms > threshold
-    speaking_time = np.sum(voice_activity) * hop_length / sr
-    silence_time = duration - speaking_time
-    
-    # Pitch analysis
-    pitches, magnitudes = librosa.piptrack(y=y, sr=sr)
-    pitch_values = []
-    for t in range(pitches.shape[1]):
-        index = magnitudes[:, t].argmax()
-        pitch = pitches[index, t]
-        if pitch > 0:
-            pitch_values.append(pitch)
-    
-    mean_pitch = float(np.mean(pitch_values)) if pitch_values else 0.0
-    pitch_range = [float(np.min(pitch_values)), float(np.max(pitch_values))] if pitch_values else [0.0, 0.0]
-    
-    # Estimate number of speakers from pitch clustering
-    estimated_speakers = 2  # Default
-    if len(pitch_values) > 100:
-        from sklearn.cluster import KMeans
-        pitch_array = np.array(pitch_values).reshape(-1, 1)
+    with LogContext("file_upload", component="upload", job_id=None):
+        # Validate file type
+        allowed_extensions = {'.mp3', '.wav', '.flac', '.ogg', '.m4a'}
+        file_ext = Path(file.filename).suffix.lower()
         
-        for n_clusters in [2, 3, 4]:
-            kmeans = KMeans(n_clusters=n_clusters, random_state=42, n_init=10)
-            labels = kmeans.fit_predict(pitch_array)
-            unique, counts = np.unique(labels, return_counts=True)
-            min_cluster_size = np.min(counts)
-            if min_cluster_size > len(pitch_values) * 0.1:
-                estimated_speakers = n_clusters
-                break
-    
-    # Assess audio quality
-    issues = []
-    recommendations = []
-    
-    peak = np.max(np.abs(y))
-    rms_level = np.sqrt(np.mean(y ** 2))
-    
-    if peak < 0.01:
-        issues.append("Very low audio level")
-        recommendations.append("Increase audio volume/gain")
-    
-    if speaking_time < 10:
-        issues.append("Less than 10 seconds of speech detected")
-        recommendations.append("Use longer audio file (30+ seconds)")
-    
-    std_pitch = np.std(pitch_values) if pitch_values else 0
-    if std_pitch < 20:
-        issues.append("Low pitch variation - might be single speaker")
-        recommendations.append("Verify audio has multiple distinct speakers")
-    
-    if duration < 20:
-        issues.append("Audio too short")
-        recommendations.append("Use audio at least 30 seconds long")
-    
-    # Overall quality assessment
-    if not issues:
-        audio_quality = "excellent"
-    elif len(issues) <= 2:
-        audio_quality = "good"
-    else:
-        audio_quality = "poor"
-    
-    # Get Ollama analysis
-    ollama_analysis = None
-    try:
-        ollama_analysis = await get_ollama_diagnostic_analysis(
-            duration, speaking_time, estimated_speakers, mean_pitch, audio_quality, issues
+        if file_ext not in allowed_extensions:
+            raise ValidationError(
+                f"Unsupported file type: {file_ext}",
+                field="filename",
+                user_message=f"File type {file_ext} not supported. Use: {', '.join(allowed_extensions)}"
+            )
+        
+        # Read and validate file size
+        file_content = await file.read()
+        file_size = len(file_content)
+        validate_file_size(file_size)
+        
+        # Validate file content is actually audio
+        try:
+            file_obj = type('obj', (object,), {'read': lambda: file_content, 'seek': lambda x: None})()
+            if not validator.is_valid_audio(file_obj):
+                raise ValidationError(
+                    "File content is not valid audio",
+                    field="file",
+                    user_message="The uploaded file does not appear to be a valid audio file"
+                )
+        except Exception as e:
+            logger.warning(
+                "Audio validation skipped due to missing validator",
+                exception=e,
+                component='upload'
+            )
+        
+        # Generate job ID and save file
+        job_id = str(uuid.uuid4())
+        upload_path = UPLOAD_DIR / f"{job_id}{file_ext}"
+        
+        try:
+            with open(upload_path, "wb") as buffer:
+                buffer.write(file_content)
+            file_content = None  # Clear memory
+        except IOError as e:
+            ErrorRecoveryHandler.handle_file_not_found(str(upload_path))
+        except OSError as e:
+            if e.errno == 28:  # No space left on device
+                ErrorRecoveryHandler.handle_disk_full()
+            raise ProcessingError("file_save", str(e))
+        
+        # Create job record
+        jobs_db[job_id] = {
+            'job_id': job_id,
+            'status': JobStatus.UPLOADED,
+            'created_at': datetime.utcnow().isoformat(),
+            'filename': file.filename,
+            'progress': 10,
+            'progress_message': 'Uploaded. Ready to diagnose.',
+            'file_path': str(upload_path),
+            'file_size': file_size,
+            'diagnostic_report': None,
+            'separated_files': None,
+            'cleaned_files': None,
+            'user_feedback': None,
+            'ollama_feedback_response': None,
+            'error': None
+        }
+        
+        logger.info(
+            "File uploaded successfully",
+            extra={
+                'job_id': job_id,
+                'filename': file.filename,
+                'file_size_mb': file_size / 1024 / 1024,
+                'file_type': file_ext
+            },
+            component='upload'
         )
-    except Exception as e:
-        print(f"Ollama analysis failed: {e}")
-    
-    return DiagnosticReport(
-        duration=duration,
-        sample_rate=int(sr),
-        speaking_time=speaking_time,
-        silence_time=silence_time,
-        estimated_speakers=estimated_speakers,
-        mean_pitch=mean_pitch,
-        pitch_range=pitch_range,
-        audio_quality=audio_quality,
-        issues=issues,
-        recommendations=recommendations,
-        ollama_analysis=ollama_analysis
-    )
+        
+        return JobResponse(**jobs_db[job_id])
 
+# ============================================================================
+# Updated Ollama Requests with Timeout & Retry
+# ============================================================================
 
+@timeout_handler(timeout_seconds=120)
+@retry_with_backoff(max_attempts=2)
 async def get_ollama_diagnostic_analysis(duration, speaking_time, estimated_speakers, 
                                         mean_pitch, quality, issues) -> str:
-    """Get Ollama's analysis of the diagnostic"""
+    """Get Ollama's analysis with timeout and retry"""
     
     url = f"{config.OLLAMA_URL}/api/generate"
     
@@ -658,21 +456,45 @@ Provide a brief analysis (2-3 sentences):
         "options": {"temperature": 0.3}
     }
     
-    loop = asyncio.get_event_loop()
     try:
+        logger.debug(
+            "Calling Ollama API for diagnostic analysis",
+            component='ollama'
+        )
+        
+        loop = asyncio.get_event_loop()
         response = await loop.run_in_executor(
             None,
             lambda: requests.post(url, json=data, timeout=OLLAMA_TIMEOUT)
         )
         
         if response.status_code == 200:
-            return response.json()['response']
+            result = response.json()['response']
+            logger.info(
+                "Ollama analysis completed",
+                extra={'response_length': len(result)},
+                component='ollama'
+            )
+            return result
+        else:
+            raise OllamaError(
+                f"Ollama API returned status {response.status_code}",
+                status_code=response.status_code
+            )
     except requests.Timeout:
-        print(f"Ollama diagnostic timeout after {OLLAMA_TIMEOUT}s")
-    except Exception as e:
-        print(f"Ollama diagnostic request failed: {e}")
-    
-    return None
+        logger.error(
+            f"Ollama diagnostic timed out",
+            extra={'timeout_seconds': OLLAMA_TIMEOUT},
+            component='ollama'
+        )
+        ErrorRecoveryHandler.handle_ollama_unavailable(OLLAMA_TIMEOUT)
+    except requests.ConnectionError as e:
+        logger.error(
+            "Failed to connect to Ollama service",
+            exception=e,
+            component='ollama'
+        )
+        raise OllamaError("Cannot reach Ollama service", status_code=502)
 
 
 async def get_ollama_feedback_response(feedback: str, job_info: dict) -> str:
@@ -938,60 +760,91 @@ async def ui_job(request: Request, job_id: str):
 
 
 @app.post("/api/v1/upload", response_model=JobResponse)
+@handle_errors()
 async def upload_audio(
     background_tasks: BackgroundTasks,
     file: UploadFile = File(...)
 ):
-    """
-    Step 1: Upload audio file
-    """
+    """Step 1: Upload audio file with comprehensive validation"""
     
-    # Validate file type
-    allowed_extensions = {'.mp3', '.wav', '.flac', '.ogg', '.m4a'}
-    file_ext = Path(file.filename).suffix.lower()
-    
-    if file_ext not in allowed_extensions:
-        raise HTTPException(400, f"Unsupported file type: {file_ext}")
-    
-    # CRITICAL FIX #6: Validate file size early
-    file_content = await file.read()
-    file_size = len(file_content)
-    validate_file_size(file_size)
-    
-    # Generate job ID
-    job_id = str(uuid.uuid4())
-    
-    # Save file
-    upload_path = UPLOAD_DIR / f"{job_id}{file_ext}"
-    
-    try:
-        with open(upload_path, "wb") as buffer:
-            buffer.write(file_content)
-    except Exception as e:
-        raise HTTPException(500, f"Failed to save file: {e}")
-    finally:
-        # Clear file from memory
-        file_content = None
-    
-    # Create job record
-    jobs_db[job_id] = {
-        'job_id': job_id,
-        'status': JobStatus.UPLOADED,
-        'created_at': datetime.utcnow().isoformat(),
-        'filename': file.filename,
-        'progress': 10,
-        'progress_message': 'Uploaded. Ready to diagnose.',
-        'file_path': str(upload_path),
-        'file_size': file_size,
-        'diagnostic_report': None,
-        'separated_files': None,
-        'cleaned_files': None,
-        'user_feedback': None,
-        'ollama_feedback_response': None,
-        'error': None
-    }
-    
-    return JobResponse(**jobs_db[job_id])
+    with LogContext("file_upload", component="upload", job_id=None):
+        # Validate file type
+        allowed_extensions = {'.mp3', '.wav', '.flac', '.ogg', '.m4a'}
+        file_ext = Path(file.filename).suffix.lower()
+        
+        if file_ext not in allowed_extensions:
+            raise ValidationError(
+                f"Unsupported file type: {file_ext}",
+                field="filename",
+                user_message=f"File type {file_ext} not supported. Use: {', '.join(allowed_extensions)}"
+            )
+        
+        # Read and validate file size
+        file_content = await file.read()
+        file_size = len(file_content)
+        validate_file_size(file_size)
+        
+        # Validate file content is actually audio
+        try:
+            file_obj = type('obj', (object,), {'read': lambda: file_content, 'seek': lambda x: None})()
+            if not validator.is_valid_audio(file_obj):
+                raise ValidationError(
+                    "File content is not valid audio",
+                    field="file",
+                    user_message="The uploaded file does not appear to be a valid audio file"
+                )
+        except Exception as e:
+            logger.warning(
+                "Audio validation skipped due to missing validator",
+                exception=e,
+                component='upload'
+            )
+        
+        # Generate job ID and save file
+        job_id = str(uuid.uuid4())
+        upload_path = UPLOAD_DIR / f"{job_id}{file_ext}"
+        
+        try:
+            with open(upload_path, "wb") as buffer:
+                buffer.write(file_content)
+            file_content = None  # Clear memory
+        except IOError as e:
+            ErrorRecoveryHandler.handle_file_not_found(str(upload_path))
+        except OSError as e:
+            if e.errno == 28:  # No space left on device
+                ErrorRecoveryHandler.handle_disk_full()
+            raise ProcessingError("file_save", str(e))
+        
+        # Create job record
+        jobs_db[job_id] = {
+            'job_id': job_id,
+            'status': JobStatus.UPLOADED,
+            'created_at': datetime.utcnow().isoformat(),
+            'filename': file.filename,
+            'progress': 10,
+            'progress_message': 'Uploaded. Ready to diagnose.',
+            'file_path': str(upload_path),
+            'file_size': file_size,
+            'diagnostic_report': None,
+            'separated_files': None,
+            'cleaned_files': None,
+            'user_feedback': None,
+            'ollama_feedback_response': None,
+            'error': None
+        }
+        
+        logger.info(
+            "File uploaded successfully",
+            extra={
+                'job_id': job_id,
+                'filename': file.filename,
+                'file_size_mb': file_size / 1024 / 1024,
+                'file_type': file_ext
+            },
+            component='upload'
+        )
+        
+        return JobResponse(**jobs_db[job_id])
 
 
 @app.get("/api/v1/jobs/{job_id}/diagnose", response_model=JobResponse)
