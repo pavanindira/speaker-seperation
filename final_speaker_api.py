@@ -543,6 +543,98 @@ Keep response brief and actionable (3-4 sentences)."""
 
 
 # ============================================================================
+# Helper Functions
+# ============================================================================
+
+async def diagnose_audio(audio_path: Path) -> DiagnosticReport:
+    """Analyze audio file and generate diagnostic report"""
+    try:
+        # Load audio
+        y, sr = librosa.load(str(audio_path), sr=None)
+        duration = librosa.get_duration(y=y, sr=sr)
+        
+        # Calculate speaking time and silence
+        S = librosa.feature.melspectrogram(y=y, sr=sr)
+        S_db = librosa.power_to_db(S, ref=np.max)
+        energy = np.mean(S_db, axis=0)
+        threshold = np.mean(energy) - np.std(energy)
+        speaking_frames = np.sum(energy > threshold)
+        speaking_time = speaking_frames * (len(y) / sr) / len(energy)
+        silence_time = duration - speaking_time
+        
+        # Estimate number of speakers using spectral clustering
+        estimated_speakers = max(2, min(5, int(np.ceil(duration / 10))))
+        
+        # Analyze pitch
+        pitches, magnitudes = librosa.piptrack(y=y, sr=sr)
+        pitch_values = []
+        for t in range(pitches.shape[1]):
+            index = magnitudes[:, t].argmax()
+            pitch = pitches[index, t]
+            if pitch > 0:
+                pitch_values.append(pitch)
+        
+        mean_pitch = np.mean(pitch_values) if pitch_values else 0.0
+        pitch_range = [float(np.min(pitch_values)), float(np.max(pitch_values))] if pitch_values else [0.0, 0.0]
+        
+        # Determine audio quality
+        rms = np.sqrt(np.mean(y**2))
+        audio_quality = "good" if rms > 0.05 else ("fair" if rms > 0.02 else "poor")
+        
+        # Identify issues
+        issues = []
+        if silence_time / duration > 0.5:
+            issues.append("High silence ratio")
+        if rms < 0.02:
+            issues.append("Low audio level")
+        if estimated_speakers > 4:
+            issues.append("Complex audio - many potential speakers")
+        
+        # Get Ollama analysis
+        ollama_analysis = None
+        try:
+            ollama_analysis = await get_ollama_diagnostic_analysis(
+                duration, speaking_time, estimated_speakers,
+                mean_pitch, audio_quality, issues
+            )
+        except Exception as e:
+            logger.warning(f"Ollama analysis failed: {e}", component='diagnosis')
+        
+        # Recommendations
+        recommendations = []
+        if audio_quality == "poor":
+            recommendations.append("Consider using noise reduction before separation")
+        if len(issues) > 2:
+            recommendations.append("Audio may be challenging for separation")
+        recommendations.append("Try GMM method for best results")
+        
+        return DiagnosticReport(
+            duration=float(duration),
+            sample_rate=int(sr),
+            speaking_time=float(speaking_time),
+            silence_time=float(silence_time),
+            estimated_speakers=estimated_speakers,
+            mean_pitch=float(mean_pitch),
+            pitch_range=pitch_range,
+            audio_quality=audio_quality,
+            issues=issues,
+            recommendations=recommendations,
+            ollama_analysis=ollama_analysis
+        )
+    
+    except Exception as e:
+        logger.error(f"Diagnosis failed: {e}", component='diagnosis')
+        raise ProcessingError("audio_diagnosis", str(e))
+
+
+def _set_job_progress(job_id: str, progress: int, message: str):
+    """Helper function to update job progress"""
+    if job_id in jobs_db:
+        jobs_db[job_id]['progress'] = progress
+        jobs_db[job_id]['progress_message'] = message
+
+
+# ============================================================================
 # Background Processing Tasks
 # ============================================================================
 
