@@ -19,11 +19,17 @@ services:
       - ./templates:/app/templates:ro
       - ./static:/app/static:ro
       - ./final_speaker_api.py:/app/final_speaker_api.py:ro
+      - ./audio_cleaner.py:/app/audio_cleaner.py:ro
+      - ./improved_speaker_separator.py:/app/improved_speaker_separator.py:ro
+      - ./final_speaker_frontend.py:/app/final_speaker_frontend.py:ro
     environment:
       - OLLAMA_URL=${OLLAMA_URL:-http://192.168.1.33:11434}
       - API_PORT=8900
+      - PYTHONUNBUFFERED=1
     networks:
       - vocal-network
+    # Note: --reload enables auto-restart on file changes for development.
+    # For production, remove --reload and rebuild the image.
     command: python final_speaker_api.py --host 0.0.0.0 --port 8900 --reload
 
 networks:

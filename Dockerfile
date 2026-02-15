@@ -1,4 +1,4 @@
-FROM python:3.11-slim
+FROM python:3.11.9-slim
 
 # Install system dependencies
 RUN apt-get update && apt-get install -y \
@@ -18,7 +18,6 @@ COPY final_speaker_frontend.html .
 COPY improved_speaker_separator.py .
 COPY config.py .
 COPY requirements.txt .
-COPY .env .
 COPY templates ./templates
 COPY static ./static
 
@@ -26,20 +25,18 @@ COPY static ./static
 # Install Python dependencies
 RUN pip install --no-cache-dir -r requirements.txt
 
-# Create necessary directories
-RUN mkdir -p conversation_output uploads outputs
-
 # Set environment variables
 ENV PYTHONUNBUFFERED=1
-ENV OLLAMA_URL=http://192.168.1.33:11434
-ENV API_PORT=8900
+
+# Create necessary directories
+RUN mkdir -p conversation_output uploads outputs temp
 
 # Expose port for API
 EXPOSE 8900
 
-# Default command - API mode
-#CMD ["python", "final_speaker_api.py"]
-#    CMD curl -f http://localhost:8900/health || exit 1
+# Health check
+HEALTHCHECK --interval=30s --timeout=10s --start-period=40s --retries=3 \
+    CMD curl -f http://localhost:8900/health || exit 1
 
 # Run the application
 CMD ["python", "final_speaker_api.py", "--host", "0.0.0.0", "--port", "8900"]

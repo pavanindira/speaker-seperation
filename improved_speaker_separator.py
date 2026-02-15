@@ -232,14 +232,13 @@ class ImprovedSpeakerSeparator:
                 speaker_audio = speaker_audio / np.max(np.abs(speaker_audio)) * 0.9
             
             # Save
-            output_path = self.output_dir / f"speaker_{speaker_id + 1}.wav"
-            sf.write(output_path, speaker_audio, sr)
+            output_file = self.output_dir / f"speaker_{speaker_id + 1}.wav"
+            sf.write(output_file, speaker_audio, sr)
             
-            results[f"speaker_{speaker_id + 1}"] = {
-                "path": str(output_path),
-                "speaking_time": float(speaking_time),
-                "speaking_percentage": float(speaking_percentage),
-                "frame_count": int(np.sum(speaker_mask))
+            results[f'speaker_{speaker_id + 1}'] = {
+                'path': str(output_file),
+                'duration': speaking_time,
+                'percentage': speaking_percentage
             }
             
             print(f"    Speaker {speaker_id + 1}: {speaking_time:.2f}s ({speaking_percentage:.1f}%)")
@@ -248,10 +247,12 @@ class ImprovedSpeakerSeparator:
     
     def separate_speakers(self, audio_path: Path, 
                          n_speakers: int = 2,
-                         method: str = 'gmm',
-                         progress_callback: Optional[callable] = None) -> Dict:
+                         method: str = 'gmm') -> Dict:
         """
         Main speaker separation pipeline
+        
+        CRITICAL FIX: Removed progress_callback parameter to match API expectations
+        The API doesn't use progress callbacks, so we don't need this parameter.
         """
         print("\n" + "=" * 60)
         print(f"Speaker Separation: {audio_path.name}")
@@ -269,15 +270,9 @@ class ImprovedSpeakerSeparator:
         frame_length = 2048
         
         # Step 1: Extract features
-        if progress_callback:
-            try: progress_callback(10, 'Loading complete: extracting features')
-            except: pass
         features = self.extract_enhanced_features(y, sr)
         
         # Step 2: Detect voice activity
-        if progress_callback:
-            try: progress_callback(30, 'Detecting voice activity')
-            except: pass
         voice_activity = self.detect_voice_activity(y, sr, frame_length, hop_length)
         
         # Ensure features and voice_activity align
@@ -287,9 +282,6 @@ class ImprovedSpeakerSeparator:
         
         # Step 3: Cluster speakers
         try:
-            if progress_callback:
-                try: progress_callback(50, 'Clustering speakers')
-                except: pass
             labels = self.cluster_speakers_advanced(
                 features, voice_activity, n_speakers, method
             )
@@ -299,18 +291,11 @@ class ImprovedSpeakerSeparator:
             raise
         
         # Step 4: Separate and save
-        if progress_callback:
-            try: progress_callback(70, 'Separating and saving speaker audio')
-            except: pass
         separated_files = self.separate_and_save(y, sr, labels, hop_length, n_speakers)
         
         print("\n" + "=" * 60)
         print("✓ Separation Complete!")
         print("=" * 60)
-        
-        if progress_callback:
-            try: progress_callback(100, 'Separation complete')
-            except: pass
         
         return {
             "speakers": separated_files,
@@ -476,7 +461,7 @@ def main():
         )
         
         print("\nOutput files:")
-        for speaker, info in results.items():
+        for speaker, info in results['speakers'].items():
             print(f"  {info['path']}")
         
         # Quality analysis

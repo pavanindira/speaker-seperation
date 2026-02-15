@@ -1,0 +1,22 @@
+# .github/workflows/test.yml
+   name: Tests
+   
+   on: [push, pull_request]
+   
+   jobs:
+     test:
+       runs-on: ubuntu-latest
+       steps:
+         - uses: actions/checkout@v3
+         - uses: actions/setup-python@v4
+           with:
+             python-version: '3.11'
+         - run: pip install -r requirements.txt
+         - run: pytest tests/
+   
+     docker:
+       runs-on: ubuntu-latest
+       steps:
+         - uses: actions/checkout@v3
+         - run: docker build -t speaker-api .
+         - run: docker run --rm speaker-api python -c "import improved_speaker_separator"

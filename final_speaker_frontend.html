@@ -334,40 +334,6 @@
             max-height: 200px;
             overflow-y: auto;
         }
-
-        /* Global loader overlay */
-        .global-loader {
-            display: none;
-            position: fixed;
-            inset: 0;
-            background: rgba(0,0,0,0.35);
-            z-index: 9999;
-            align-items: center;
-            justify-content: center;
-        }
-
-        .global-loader.active { display: flex; }
-
-        .loader-box {
-            background: white;
-            padding: 1rem 1.5rem;
-            border-radius: 8px;
-            display: flex;
-            gap: 1rem;
-            align-items: center;
-            box-shadow: 0 8px 30px rgba(0,0,0,0.3);
-        }
-
-        .spinner {
-            width: 28px;
-            height: 28px;
-            border-radius: 50%;
-            border: 4px solid #e5e7eb;
-            border-top-color: #667eea;
-            animation: spin 1s linear infinite;
-        }
-
-        @keyframes spin { to { transform: rotate(360deg); } }
     </style>
 </head>
 <body>
@@ -412,16 +378,8 @@
             <div class="upload-area" id="uploadArea">
                 <input type="file" id="fileInput" accept="audio/*">
                 <div>
-                <!-- Debug info -->
-                <div id="debugInfo" class="debug-info" style="display: none;"></div>
-
-                <!-- Global loader overlay -->
-                <div id="globalLoader" class="global-loader" role="status" aria-hidden="true">
-                    <div class="loader-box">
-                        <div class="spinner"></div>
-                        <div>Processing... please wait</div>
-                    </div>
-                </div>
+                    <h2>📁 Drop your audio file here</h2>
+                    <p>or click to browse</p>
                     <p style="color: #999; margin-top: 1rem;">Supported: MP3, WAV, FLAC, OGG, M4A</p>
                 </div>
             </div>
@@ -445,7 +403,7 @@
                     </select>
                 </div>
             </div>
-            <button id="proceedBtn" onclick="proceedWithSeparation()">✓ Proceed with Separation</button>
+            <button onclick="proceedWithSeparation()">✓ Proceed with Separation</button>
             <button class="secondary" onclick="cancelJob()">✗ Cancel</button>
         </div>
         
@@ -519,7 +477,7 @@
     </div>
 
     <script>
-        const API_URL = window.location.origin; // use current origin for API calls
+        const API_URL = 'http://localhost:8000';
         let currentJobId = null;
         let currentStep = 1;
         let selectedRating = 0;
@@ -536,25 +494,6 @@
                     debugDiv.innerHTML += `<pre>${JSON.stringify(data, null, 2)}</pre>`;
                 }
                 debugDiv.scrollTop = debugDiv.scrollHeight;
-            }
-        }
-
-        // Loader helpers
-        function showLoader(text) {
-            const loader = document.getElementById('globalLoader');
-            if (loader) {
-                loader.classList.add('active');
-                loader.setAttribute('aria-hidden', 'false');
-                const boxText = loader.querySelector('.loader-box div:nth-child(2)');
-                if (boxText && text) boxText.textContent = text;
-            }
-        }
-
-        function hideLoader() {
-            const loader = document.getElementById('globalLoader');
-            if (loader) {
-                loader.classList.remove('active');
-                loader.setAttribute('aria-hidden', 'true');
             }
         }
         
@@ -588,81 +527,35 @@
         });
         
         async function handleFile(file) {
-            log('Uploading file', {name: file.name, size: (file.size/1024/1024).toFixed(2) + ' MB'});
+            log('Uploading file', {name: file.name, size: file.size});
             
-            // Show upload progress area
-            let progressEl = document.getElementById('uploadProgress');
-            if (!progressEl) {
-                progressEl = document.createElement('div');
-                progressEl.id = 'uploadProgress';
-                progressEl.style.marginTop = '1rem';
-                uploadArea.appendChild(progressEl);
-            }
-            
-            fileInput.disabled = true;
-            showLoader('Uploading file...');
+            uploadArea.innerHTML = `
+                <h2>⏳ Uploading ${file.name}</h2>
+                <p>Please wait...</p>
+            `;
             
             const formData = new FormData();
             formData.append('file', file);
             
             try {
-                // Use XMLHttpRequest for upload progress tracking
-                const uploadPromise = new Promise((resolve, reject) => {
-                    const xhr = new XMLHttpRequest();
-                    
-                    // Track upload progress
-                    xhr.upload.addEventListener('progress', (e) => {
-                        if (e.lengthComputable) {
-                            const pct = Math.round((e.loaded / e.total) * 100);
-                            const mb = (e.loaded / 1024 / 1024).toFixed(2);
-                            const totalMb = (e.total / 1024 / 1024).toFixed(2);
-                            progressEl.innerHTML = `
-                                <div style="margin-bottom: 0.5rem;">
-                                    <div style="font-size: 0.9rem; color: #374151; margin-bottom: 0.5rem;">${pct}% — ${mb} MB / ${totalMb} MB</div>
-                                    <div style="width: 100%; height: 6px; background: #e5e7eb; border-radius: 3px; overflow: hidden;">
-                                        <div style="width: ${pct}%; height: 100%; background: linear-gradient(90deg, #667eea 0%, #764ba2 100%); transition: width 0.2s;"></div>
-                                    </div>
-                                </div>
-                            `;
-                            log(`Upload progress: ${pct}%`);
-                        }
-                    });
-                    
-                    xhr.addEventListener('load', () => {
-                        if (xhr.status === 200) {
-                            const job = JSON.parse(xhr.responseText);
-                            resolve(job);
-                        } else {
-                            reject(new Error(`Upload failed with status ${xhr.status}`));
-                        }
-                    });
-                    
-                    xhr.addEventListener('error', () => {
-                        reject(new Error('Upload failed: Network error'));
-                    });
-                    
-                    xhr.addEventListener('abort', () => {
-                        reject(new Error('Upload cancelled'));
-                    });
-                    
-                    xhr.open('POST', `${API_URL}/api/v1/upload`);
-                    xhr.send(formData);
+                const response = await fetch(`${API_URL}/api/v1/upload`, {
+                    method: 'POST',
+                    body: formData
                 });
                 
-                const job = await uploadPromise;
+                if (!response.ok) throw new Error('Upload failed');
+                
+                const job = await response.json();
                 currentJobId = job.job_id;
                 
                 log('Upload successful', job);
-                hideLoader();
                 
                 // Move to diagnostic step
                 await getDiagnostic();
                 
             } catch (error) {
                 log('Upload error', error);
-                hideLoader();
-                fileInput.disabled = false;
-                progressEl.innerHTML = '';
+                uploadArea.innerHTML = `
                     <div class="error">Upload failed: ${error.message}</div>
                     <button onclick="location.reload()">Try Again</button>
                 `;
@@ -672,7 +565,6 @@
         async function getDiagnostic() {
             goToStep(2);
             document.getElementById('diagnosticReport').innerHTML = '<p>⏳ Analyzing audio...</p>';
-            showLoader('Analyzing audio...');
             
             try {
                 const response = await fetch(`${API_URL}/api/v1/jobs/${currentJobId}/diagnose`);
@@ -744,11 +636,9 @@
                 }
                 
                 document.getElementById('diagnosticReport').innerHTML = html;
-                hideLoader();
                 
             } catch (error) {
                 log('Diagnostic error', error);
-                hideLoader();
                 document.getElementById('diagnosticReport').innerHTML = `
                     <div class="error">Failed to get diagnostic: ${error.message}</div>
                 `;
@@ -762,12 +652,6 @@
             log('Starting separation', {numSpeakers, method});
             
             try {
-                // disable proceed button to prevent duplicates
-                const proceedBtn = document.getElementById('proceedBtn');
-                if (proceedBtn) proceedBtn.disabled = true;
-
-                showLoader('Starting separation...');
-
                 const response = await fetch(`${API_URL}/api/v1/jobs/${currentJobId}/proceed`, {
                     method: 'POST',
                     headers: {'Content-Type': 'application/json'},
@@ -788,57 +672,38 @@
                 
             } catch (error) {
                 log('Separation start error', error);
-                hideLoader();
                 alert(`Error: ${error.message}`);
             }
         }
         
         async function pollSeparationStatus() {
-            // Use Server-Sent Events (SSE) for real-time updates instead of polling
-            const eventSource = new EventSource(`${API_URL}/api/v1/jobs/${currentJobId}/stream`);
-            
-            eventSource.addEventListener('message', (event) => {
+            const interval = setInterval(async () => {
                 try {
-                    const data = JSON.parse(event.data);
-                    log('Status update', data);
+                    const response = await fetch(`${API_URL}/api/v1/jobs/${currentJobId}`);
+                    const job = await response.json();
                     
-                    const pct = data.progress || 0;
-                    const msg = data.message || '';
-                    const status = data.status || '';
+                    log('Poll status', {status: job.status});
                     
                     document.getElementById('separationStatus').textContent = 
-                        `Status: ${status} — ${pct}% ${msg}`;
+                        `Status: ${job.status}...`;
                     
-                    // Update progress bar width
-                    const progressBar = document.querySelector('.progress-fill');
-                    if (progressBar) {
-                        progressBar.style.width = `${Math.min(pct, 95)}%`;
-                    }
-                    
-                    // Check if done
-                    if (status === 'separated' || status === 'completed') {
-                        eventSource.close();
-                        hideLoader();
-                        log('Separation complete', data);
-                        displaySeparatedFiles(data);
-                    } else if (status === 'failed') {
-                        eventSource.close();
-                        log('Separation failed', data);
+                    if (job.status === 'separated') {
+                        clearInterval(interval);
+                        log('Separation complete', job);
+                        displaySeparatedFiles(job);
+                    } else if (job.status === 'failed') {
+                        clearInterval(interval);
+                        log('Separation failed', job);
                         document.getElementById('separationStatus').innerHTML = 
-                            `<div class="error">Separation failed: ${data.error || 'Unknown error'}</div>`;
+                            `<div class="error">Separation failed: ${job.error || 'Unknown error'}</div>`;
                     }
-                } catch (e) {
-                    log('Parse error', e);
+                } catch (error) {
+                    log('Poll error', error);
+                    clearInterval(interval);
+                    document.getElementById('separationStatus').innerHTML = 
+                        `<div class="error">Error checking status: ${error.message}</div>`;
                 }
-            });
-            
-            eventSource.addEventListener('error', (event) => {
-                log('SSE error', event);
-                eventSource.close();
-                hideLoader();
-                document.getElementById('separationStatus').innerHTML = 
-                    `<div class="error">Connection lost during separation</div>`;
-            });
+            }, 2000);
         }
         
         function displaySeparatedFiles(job) {
@@ -860,20 +725,10 @@
             
             let html = '';
             for (const [speaker, url] of Object.entries(job.separated_files)) {
-                // url may be absolute or start with '/'
-                let href = url;
-                try {
-                    if (!/^https?:\/\//i.test(url)) {
-                        href = `${window.location.origin}${url}`;
-                    }
-                } catch(e) { href = url; }
-
-                // Use onclick with fetch to avoid browser URL encoding issues
-                const encodedUrl = btoa(href); // Encode URL for safe passing
                 html += `
                     <div class="file-item">
                         <span>🎤 ${speaker}.wav</span>
-                        <button class="download-btn" onclick="downloadFile('${encodedUrl}', '${speaker}.wav')">⬇️ Download</button>
+                        <a href="${API_URL}${url}" class="download-btn" download>⬇️ Download</a>
                     </div>
                 `;
             }
@@ -884,30 +739,6 @@
         function showCleaningSection() {
             goToStep(5);
         }
-
-        function downloadFile(encodedUrl, filename) {
-            const url = atob(encodedUrl);
-            fetch(url, { method: 'GET' })
-                .then(response => {
-                    if (!response.ok) throw new Error(`Download failed with status ${response.status}`);
-                    return response.blob();
-                })
-                .then(blob => {
-                    const downloadUrl = window.URL.createObjectURL(blob);
-                    const a = document.createElement('a');
-                    a.href = downloadUrl;
-                    a.download = filename;
-                    document.body.appendChild(a);
-                    a.click();
-                    window.URL.revokeObjectURL(downloadUrl);
-                    a.remove();
-                })
-                .catch(error => {
-                    log('Download error', error);
-                    alert(`Download failed: ${error.message}`);
-                });
-        }
-
         
         async function startCleaning() {
             document.getElementById('cleaningProgress').classList.add('active');
@@ -975,15 +806,10 @@
             
             if (job.cleaned_files && Object.keys(job.cleaned_files).length > 0) {
                 for (const [speaker, url] of Object.entries(job.cleaned_files)) {
-                    let href = url;
-                    try {
-                        if (!/^https?:\/\//i.test(url)) href = `${window.location.origin}${url}`;
-                    } catch(e) { href = url; }
-
                     html += `
                         <div class="file-item">
                             <span>✨ ${speaker}.wav</span>
-                            <a href="${href}" class="download-btn" download>⬇️ Download</a>
+                            <a href="${API_URL}${url}" class="download-btn" download>⬇️ Download</a>
                         </div>
                     `;
                 }
