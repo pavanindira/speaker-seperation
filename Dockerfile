@@ -6,6 +6,7 @@ RUN apt-get update && apt-get install -y \
     libsndfile1 \
     git \
     curl \
+    nano \
     && rm -rf /var/lib/apt/lists/*
 
 # Set working directory
@@ -20,7 +21,7 @@ COPY config.py .
 COPY requirements.txt .
 COPY templates ./templates
 COPY static ./static
-
+COPY .env ./.env
 
 # Install Python dependencies
 RUN pip install --no-cache-dir -r requirements.txt
