@@ -9,22 +9,14 @@ services:
     ports:
       - "8900:8900"
     volumes:
-      - ./conversation_output:/app/conversation_output
-      - ./uploads:/app/uploads
-      - ./outputs:/app/outputs
-      - ./data:/app/data
-      - ./data/test.mpeg:/app/data/test.mpeg:ro
-      - ./data/DIALOGUE.ogg:/app/data/DIALOGUE.ogg:ro
-      # UI + app code (so you don't need rebuilds for template/JS changes)
-      - ./templates:/app/templates:ro
-      - ./static:/app/static:ro
-      - ./final_speaker_api.py:/app/final_speaker_api.py:ro
-      - ./audio_cleaner.py:/app/audio_cleaner.py:ro
-      - ./improved_speaker_separator.py:/app/improved_speaker_separator.py:ro
-      - ./logger_wrapper.py:/app/logger_wrapper.py:ro
-      - ./error_handler.py:/app/error_handler.py:ro
-      - ./security_improvements.py:/app/security_improvements.py:ro
-      - ./monitoring_observability.py:/app/monitoring_observability.py:ro
+      # Mount entire project root for development (read-write)
+      - .:/app:rw
+      # Persist these directories across container restarts
+      - conversation_output-data:/app/conversation_output
+      - uploads-data:/app/uploads
+      - outputs-data:/app/outputs
+      - temp-data:/app/temp
+      - logs-data:/app/logs
     environment:
       - OLLAMA_URL=${OLLAMA_URL:-http://192.168.1.33:11434}
       - API_PORT=8900
@@ -38,3 +30,10 @@ services:
 networks:
   vocal-network:
     driver: bridge
+
+volumes:
+  conversation_output-data:
+  uploads-data:
+  outputs-data:
+  temp-data:
+  logs-data:

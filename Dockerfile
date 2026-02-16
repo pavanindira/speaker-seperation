@@ -12,21 +12,8 @@ RUN apt-get update && apt-get install -y \
 # Set working directory
 WORKDIR /app
 
-# Copy application code
-COPY final_speaker_api.py .
-COPY audio_cleaner.py .
-COPY final_speaker_frontend.html .
-COPY improved_speaker_separator.py .
-COPY config.py .
+# Copy requirements first for better caching
 COPY requirements.txt .
-COPY templates ./templates
-COPY static ./static
-COPY .env.example ./.env
-COPY logger_wrapper.py .
-COPY error_handler.py .
-COPY security_improvements.py .
-COPY monitoring_observability.py .
-
 
 # Install Python dependencies
 RUN pip install --no-cache-dir -r requirements.txt
@@ -35,7 +22,10 @@ RUN pip install --no-cache-dir -r requirements.txt
 ENV PYTHONUNBUFFERED=1
 
 # Create necessary directories
-RUN mkdir -p conversation_output uploads outputs temp
+RUN mkdir -p conversation_output uploads outputs temp logs data
+
+# Note: Application code is mounted via docker-compose.yml volume
+# This allows for hot-reloading during development without rebuilding
 
 # Expose port for API
 EXPOSE 8900

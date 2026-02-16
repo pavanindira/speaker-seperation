@@ -14,10 +14,10 @@
             --success: #10B981;
             --error: #EF4444;
             --warning: #F59E0B;
+            --info: #3B82F6;
             --gray-50: #F9FAFB;
             --gray-100: #F3F4F6;
             --gray-800: #1F2937;
-            --shadow-lg: 0 10px 15px -3px rgba(0, 0, 0, 0.1);
         }
         
         * {
@@ -51,7 +51,6 @@
             to { opacity: 1; transform: translateY(0); }
         }
         
-        /* Header */
         h1 {
             font-size: 32px;
             color: var(--gray-800);
@@ -223,6 +222,126 @@
             color: #6B7280;
         }
         
+        /* ENHANCED ERROR DISPLAY */
+        .error-container {
+            display: none;
+            margin-top: 30px;
+            background: white;
+            border-radius: 12px;
+            padding: 30px;
+            animation: slideUp 0.5s ease-out;
+        }
+        
+        .error-container.active {
+            display: block;
+        }
+        
+        .error-container.error {
+            border-left: 4px solid var(--error);
+        }
+        
+        .error-container.warning {
+            border-left: 4px solid var(--warning);
+        }
+        
+        .error-container.info {
+            border-left: 4px solid var(--info);
+        }
+        
+        .error-header {
+            display: flex;
+            align-items: center;
+            margin-bottom: 20px;
+        }
+        
+        .error-icon-large {
+            font-size: 64px;
+            margin-right: 20px;
+        }
+        
+        .error-header-text h3 {
+            font-size: 24px;
+            font-weight: 600;
+            color: var(--gray-800);
+            margin-bottom: 8px;
+        }
+        
+        .error-message {
+            font-size: 16px;
+            color: #6B7280;
+            line-height: 1.6;
+            margin-bottom: 24px;
+        }
+        
+        .helpful-tips {
+            background: var(--gray-50);
+            border-radius: 8px;
+            padding: 16px;
+            margin-bottom: 20px;
+        }
+        
+        .helpful-tips h4 {
+            font-size: 16px;
+            font-weight: 600;
+            color: var(--gray-800);
+            margin-bottom: 12px;
+            display: flex;
+            align-items: center;
+        }
+        
+        .helpful-tips h4::before {
+            content: "💡";
+            margin-right: 8px;
+        }
+        
+        .helpful-tips ul {
+            list-style: none;
+            padding: 0;
+        }
+        
+        .helpful-tips li {
+            padding: 8px 0;
+            padding-left: 24px;
+            position: relative;
+            color: #4B5563;
+            line-height: 1.5;
+        }
+        
+        .helpful-tips li::before {
+            content: "→";
+            position: absolute;
+            left: 0;
+            color: var(--primary);
+            font-weight: bold;
+        }
+        
+        .error-actions {
+            display: flex;
+            gap: 12px;
+            margin-bottom: 20px;
+            flex-wrap: wrap;
+        }
+        
+        .error-footer {
+            border-top: 1px solid var(--gray-100);
+            padding-top: 16px;
+            text-align: center;
+        }
+        
+        .error-id {
+            display: block;
+            color: #9CA3AF;
+            font-size: 12px;
+            font-family: monospace;
+            margin-bottom: 8px;
+        }
+        
+        .support-message {
+            display: block;
+            color: #6B7280;
+            font-size: 13px;
+        }
+        
         /* Buttons */
         .btn {
             display: inline-flex;
@@ -254,54 +373,24 @@
             border: 2px solid #E5E7EB;
         }
         
+        .btn-secondary:hover {
+            background: var(--gray-50);
+        }
+        
         .download-btn {
             background: var(--success);
             color: white;
             padding: 10px 20px;
             border-radius: 8px;
             font-size: 14px;
-        }
-        
-        /* Error */
-        .error-message {
-            background: #FEE2E2;
-            border: 2px solid var(--error);
-            border-radius: 12px;
-            padding: 20px;
-            margin-top: 20px;
-            display: none;
-        }
-        
-        .error-message.active {
-            display: block;
-        }
-        
-        .error-icon {
-            font-size: 48px;
-            text-align: center;
-            margin-bottom: 12px;
-        }
-        
-        .error-title {
-            font-size: 18px;
             font-weight: 600;
-            color: var(--gray-800);
-            margin-bottom: 8px;
-            text-align: center;
+            text-decoration: none;
+            transition: all 0.3s;
         }
         
-        .error-text {
-            font-size: 14px;
-            color: #6B7280;
-            text-align: center;
-            margin-bottom: 16px;
-        }
-        
-        .error-actions {
-            display: flex;
-            gap: 12px;
-            justify-content: center;
-            flex-wrap: wrap;
+        .download-btn:hover {
+            background: #059669;
+            transform: translateY(-2px);
         }
         
         /* Settings */
@@ -381,12 +470,12 @@
             
             .speaker-card {
                 flex-direction: column;
+                text-align: center;
             }
             
             .speaker-info {
                 flex-direction: column;
                 margin-bottom: 12px;
-                text-align: center;
             }
             
             .setting-row {
@@ -397,6 +486,20 @@
             
             .btn {
                 width: 100%;
+            }
+            
+            .error-header {
+                flex-direction: column;
+                text-align: center;
+            }
+            
+            .error-icon-large {
+                margin-right: 0;
+                margin-bottom: 16px;
+            }
+            
+            .error-actions {
+                flex-direction: column;
             }
         }
     </style>
@@ -475,39 +578,17 @@
             </button>
         </div>
         
-        <!-- Error Section -->
-        <div class="error-message" id="errorMessage">
-            <div class="error-icon" id="errorIcon">❌</div>
-            <div class="error-title" id="errorTitle">Error</div>
-            <div class="error-text" id="errorText"></div>
-            <div class="error-actions">
-                <button class="btn btn-primary" onclick="retryUpload()">Try Again</button>
-                <button class="btn btn-secondary" onclick="resetApp()">Start Over</button>
-            </div>
+        <!-- ENHANCED Error Container -->
+        <div class="error-container" id="errorContainer">
+            <!-- Error content will be inserted here by JavaScript -->
         </div>
     </div>
     
     <script>
-        const API_BASE = window.location.origin || 'http://localhost:8900';
-        // API key is fetched dynamically when needed (see getAuthHeaders())
+        const API_BASE = window.location.origin;
         
         let currentJobId = null;
         let websocket = null;
-        
-        /**
-         * Get authentication headers for API requests
-         * For demo/development: No auth required for public endpoints
-         * For production: Implement proper authentication flow
-         */
-        function getAuthHeaders() {
-            const headers = {
-                'Content-Type': 'application/json'
-            };
-            // In production, fetch token from secure source:
-            // const token = sessionStorage.getItem('auth_token');
-            // if (token) headers['Authorization'] = `Bearer ${token}`;
-            return headers;
-        }
         
         // Upload area drag & drop
         const uploadArea = document.getElementById('uploadArea');
@@ -538,21 +619,48 @@
         });
         
         async function handleFileSelect(file) {
-            // Validate file
-            if (!file.type.startsWith('audio/')) {
-                showError('Invalid File', 'Please upload an audio file (MP3, WAV, M4A)');
+            // Basic client-side validation
+            if (!file.type.startsWith('audio/') && !file.name.match(/\.(mp3|wav|m4a|flac|ogg)$/i)) {
+                showError({
+                    error: {
+                        icon: '⚠️',
+                        title: 'Invalid File Type',
+                        message: 'Please upload an audio file.',
+                        severity: 'warning',
+                        helpful_tips: [
+                            'Supported formats: MP3, WAV, M4A, FLAC, OGG',
+                            'Make sure your file is an audio recording',
+                            'Check the file extension'
+                        ],
+                        can_retry: true
+                    }
+                });
                 return;
             }
             
             if (file.size > 100 * 1024 * 1024) {
-                showError('File Too Large', 'Maximum file size is 100MB. Please compress your audio or split it into smaller files.');
+                showError({
+                    error: {
+                        icon: '📁',
+                        title: 'File Too Large',
+                        message: `Your file is ${(file.size / 1024 / 1024).toFixed(1)}MB. Maximum size is 100MB.`,
+                        severity: 'error',
+                        helpful_tips: [
+                            'Try compressing your audio (reduce quality to 128kbps)',
+                            'Split longer recordings into smaller chunks',
+                            'Use a tool like Audacity to reduce file size'
+                        ],
+                        can_retry: true
+                    }
+                });
                 return;
             }
             
             // Show progress
             document.getElementById('uploadSection').style.display = 'none';
             document.getElementById('progressSection').classList.add('active');
-            document.getElementById('errorMessage').classList.remove('active');
+            document.getElementById('errorContainer').classList.remove('active');
+            document.getElementById('resultsSection').classList.remove('active');
             
             // Upload file
             await uploadFile(file);
@@ -565,101 +673,152 @@
             try {
                 const response = await fetch(`${API_BASE}/api/v1/upload`, {
                     method: 'POST',
-                    // Don't set Content-Type for FormData - browser sets it with boundary
                     body: formData
                 });
                 
                 const data = await response.json();
                 
                 if (!response.ok) {
-                    throw new Error(data.error?.message || 'Upload failed');
+                    // Backend returned an error - display it
+                    showError(data);
+                    return;
                 }
                 
                 currentJobId = data.job_id;
                 
-                // Connect WebSocket for progress
-                connectWebSocket(currentJobId);
-                
-                // Start separation
-                await startSeparation(currentJobId);
+                // Start diagnosis
+                await startDiagnosis(currentJobId);
                 
             } catch (error) {
-                showError('Upload Failed', error.message);
+                showError({
+                    error: {
+                        icon: '❌',
+                        title: 'Upload Failed',
+                        message: error.message || 'Failed to upload file',
+                        severity: 'error',
+                        helpful_tips: [
+                            'Check your internet connection',
+                            'Make sure the server is running',
+                            'Try refreshing the page and uploading again'
+                        ],
+                        can_retry: true
+                    }
+                });
             }
         }
         
-        function connectWebSocket(jobId) {
-            const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
-            websocket = new WebSocket(`${protocol}//${window.location.host}/ws/progress/${jobId}`);
-            
-            websocket.onmessage = (event) => {
-                const data = JSON.parse(event.data);
-                if (data.type !== 'ping') {
-                    updateProgress(data);
+        async function startDiagnosis(jobId) {
+            try {
+                const response = await fetch(`${API_BASE}/api/v1/jobs/${jobId}/diagnose`, {
+                    method: 'POST'
+                });
+                
+                const data = await response.json();
+                
+                if (!response.ok) {
+                    showError(data);
+                    return;
                 }
-            };
-            
-            websocket.onerror = () => {
-                console.log('WebSocket error, falling back to polling');
-                startPolling(jobId);
-            };
+                
+                // Auto-proceed to separation
+                await startSeparation(jobId);
+                
+            } catch (error) {
+                showError({
+                    error: {
+                        icon: '🔧',
+                        title: 'Diagnosis Failed',
+                        message: error.message,
+                        severity: 'error',
+                        can_retry: true
+                    }
+                });
+            }
         }
         
         async function startSeparation(jobId) {
             const numSpeakers = parseInt(document.getElementById('numSpeakers').value);
             const method = document.getElementById('method').value;
             
-            const response = await fetch(`${API_BASE}/api/v1/jobs/${jobId}/proceed`, {
-                method: 'POST',
-                headers: getAuthHeaders(),
-                body: JSON.stringify({
-                    action: 'proceed',
-                    num_speakers: numSpeakers,
-                    method: method
-                })
-            });
-            
-            if (!response.ok) {
-                const data = await response.json();
-                throw new Error(data.error?.message || 'Separation failed');
-            }
-        }
-        
-        function updateProgress(data) {
-            const { stage, percent, message } = data;
-            
-            document.getElementById('progressBar').style.width = `${percent}%`;
-            document.getElementById('progressPercent').textContent = `${percent}%`;
-            document.getElementById('stageText').textContent = message;
-            
-            const icons = {
-                'upload': '📤',
-                'loading': '📂',
-                'analyzing': '🔍',
-                'separating': '🎤',
-                'finalizing': '✨',
-                'complete': '✅',
-                'error': '❌'
-            };
-            document.getElementById('stageIcon').textContent = icons[stage] || '⚙️';
-            
-            if (stage === 'complete') {
-                fetchResults();
-            } else if (stage === 'error') {
-                showError('Processing Failed', message);
-            }
-        }
-        
-        async function fetchResults() {
             try {
-                const response = await fetch(`${API_BASE}/api/v1/jobs/${currentJobId}`);
+                const response = await fetch(`${API_BASE}/api/v1/jobs/${jobId}/proceed`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        action: 'proceed',
+                        num_speakers: numSpeakers,
+                        method: method
+                    })
+                });
                 
-                const job = await response.json();
-                displayResults(job);
+                const data = await response.json();
+                
+                if (!response.ok) {
+                    showError(data);
+                    return;
+                }
+                
+                // Poll for results
+                pollForResults(jobId);
                 
             } catch (error) {
-                showError('Failed to Load Results', error.message);
+                showError({
+                    error: {
+                        icon: '⏱️',
+                        title: 'Processing Failed',
+                        message: error.message,
+                        severity: 'error',
+                        can_retry: true
+                    }
+                });
             }
+        }
+        
+        function pollForResults(jobId) {
+            const interval = setInterval(async () => {
+                try {
+                    const response = await fetch(`${API_BASE}/api/v1/jobs/${jobId}`);
+                    const job = await response.json();
+                    
+                    // Update progress if available
+                    if (job.progress !== undefined) {
+                        document.getElementById('progressBar').style.width = `${job.progress}%`;
+                        document.getElementById('progressPercent').textContent = `${job.progress}%`;
+                    }
+                    
+                    if (job.progress_message) {
+                        document.getElementById('stageText').textContent = job.progress_message;
+                    }
+                    
+                    // Check if complete
+                    if (job.status === 'completed' || job.status === 'separated') {
+                        clearInterval(interval);
+                        displayResults(job);
+                    } else if (job.status === 'failed') {
+                        clearInterval(interval);
+                        showError({
+                            error: {
+                                icon: '❌',
+                                title: 'Processing Failed',
+                                message: job.error || 'An error occurred during processing',
+                                severity: 'error',
+                                can_retry: true
+                            }
+                        });
+                    }
+                } catch (error) {
+                    clearInterval(interval);
+                    showError({
+                        error: {
+                            icon: '❌',
+                            title: 'Connection Error',
+                            message: 'Lost connection to server',
+                            severity: 'error',
+                            can_retry: true
+                        }
+                    });
+                }
+            }, 2000); // Poll every 2 seconds
         }
         
         function displayResults(job) {
@@ -669,7 +828,8 @@
             const speakerCards = document.getElementById('speakerCards');
             speakerCards.innerHTML = '';
             
-            Object.entries(job.separated_files || {}).forEach(([speaker, url], index) => {
+            const files = job.separated_files || {};
+            Object.entries(files).forEach(([speaker, url], index) => {
                 const card = document.createElement('div');
                 card.className = 'speaker-card';
                 card.innerHTML = `
@@ -688,15 +848,68 @@
             });
         }
         
-        function showError(title, message) {
+        /**
+         * ENHANCED ERROR DISPLAY FUNCTION
+         * Properly displays the new error format from backend
+         */
+        function showError(errorResponse) {
+            // Hide other sections
+            document.getElementById('uploadSection').style.display = 'none';
             document.getElementById('progressSection').classList.remove('active');
-            document.getElementById('errorMessage').classList.add('active');
-            document.getElementById('errorTitle').textContent = title;
-            document.getElementById('errorText').textContent = message;
+            document.getElementById('resultsSection').classList.remove('active');
+            
+            const error = errorResponse.error || errorResponse;
+            
+            // Build error HTML
+            const errorHTML = `
+                <div class="error-header">
+                    <div class="error-icon-large">${error.icon || '❌'}</div>
+                    <div class="error-header-text">
+                        <h3>${error.title || 'Error'}</h3>
+                    </div>
+                </div>
+                
+                <div class="error-message">
+                    ${error.message || 'An error occurred'}
+                </div>
+                
+                ${error.helpful_tips && error.helpful_tips.length > 0 ? `
+                    <div class="helpful-tips">
+                        <h4>What You Can Do:</h4>
+                        <ul>
+                            ${error.helpful_tips.map(tip => `<li>${tip}</li>`).join('')}
+                        </ul>
+                    </div>
+                ` : ''}
+                
+                <div class="error-actions">
+                    ${error.can_retry ? `
+                        <button class="btn btn-primary" onclick="retryUpload()">
+                            🔄 Try Again
+                        </button>
+                    ` : ''}
+                    <button class="btn btn-secondary" onclick="resetApp()">
+                        🏠 Start Over
+                    </button>
+                </div>
+                
+                ${error.error_id ? `
+                    <div class="error-footer">
+                        <span class="error-id">Error ID: ${error.error_id}</span>
+                        <span class="support-message">
+                            Need help? Include this error ID when contacting support
+                        </span>
+                    </div>
+                ` : ''}
+            `;
+            
+            const errorContainer = document.getElementById('errorContainer');
+            errorContainer.innerHTML = errorHTML;
+            errorContainer.className = `error-container active ${error.severity || 'error'}`;
         }
         
         function retryUpload() {
-            document.getElementById('errorMessage').classList.remove('active');
+            document.getElementById('errorContainer').classList.remove('active');
             document.getElementById('uploadSection').style.display = 'block';
             fileInput.click();
         }
@@ -705,12 +918,7 @@
             document.getElementById('uploadSection').style.display = 'block';
             document.getElementById('progressSection').classList.remove('active');
             document.getElementById('resultsSection').classList.remove('active');
-            document.getElementById('errorMessage').classList.remove('active');
-            
-            if (websocket) {
-                websocket.close();
-                websocket = null;
-            }
+            document.getElementById('errorContainer').classList.remove('active');
             
             currentJobId = null;
             fileInput.value = '';
@@ -727,18 +935,6 @@
                 fileInput.click();
             }
         });
-
-        function startPolling(jobId) {
-            const interval = setInterval(async () => {
-                const response = await fetch(`${API_BASE}/api/v1/jobs/${jobId}`);
-                const data = await response.json();
-                updateProgress(data);
-                if (data.stage === 'complete' || data.stage === 'error') {
-                    clearInterval(interval);
-                }
-            }, 2000);
-        }
-
     </script>
 </body>
 </html>
