@@ -1,6 +1,22 @@
 version: '3.8'
 
 services:
+  # Redis for rate limiting and caching
+  redis:
+    image: redis:7-alpine
+    container_name: speaker-separator-redis
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis-data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - vocal-network
+
   speaker-separator:
     build:
       context: .
@@ -21,6 +37,13 @@ services:
       - OLLAMA_URL=${OLLAMA_URL:-http://192.168.1.33:11434}
       - API_PORT=8900
       - PYTHONUNBUFFERED=1
+      - REDIS_URL=redis://redis:6379
+      - JWT_SECRET_KEY=${JWT_SECRET_KEY:-}
+      - ENABLE_AUTH=${ENABLE_AUTH:-false}
+      - API_KEY=${API_KEY:-}
+    depends_on:
+      redis:
+        condition: service_healthy
     networks:
       - vocal-network
     # Note: --reload enables auto-restart on file changes for development.
@@ -32,6 +55,7 @@ networks:
     driver: bridge
 
 volumes:
+  redis-data:
   conversation_output-data:
   uploads-data:
   outputs-data:

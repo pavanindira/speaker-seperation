@@ -7,6 +7,9 @@
     <title>Speaker Separation - Split Voices Instantly</title>
     <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🎤</text></svg>">
     
+    <!-- WaveSurfer.js for waveform visualization -->
+    <script src="https://unpkg.com/wavesurfer.js@7/dist/wavesurfer.min.js"></script>
+    
     <style>
         :root {
             --primary: #4F46E5;
@@ -18,6 +21,19 @@
             --gray-50: #F9FAFB;
             --gray-100: #F3F4F6;
             --gray-800: #1F2937;
+            --bg-gradient: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            --container-bg: white;
+            --text-color: #1F2937;
+        }
+        
+        /* Dark Mode Variables */
+        body.dark-mode {
+            --bg-gradient: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%);
+            --container-bg: #0f172a;
+            --text-color: #f1f5f9;
+            --gray-50: #1e293b;
+            --gray-100: #334155;
+            --gray-800: #f1f5f9;
         }
         
         * {
@@ -28,22 +44,25 @@
         
         body {
             font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            background: var(--bg-gradient);
             min-height: 100vh;
             display: flex;
             align-items: center;
             justify-content: center;
             padding: 20px;
+            transition: background 0.3s ease;
         }
         
         .container {
-            background: white;
+            background: var(--container-bg);
             border-radius: 20px;
             box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.25);
             max-width: 700px;
             width: 100%;
             padding: 40px;
             animation: slideUp 0.5s ease-out;
+            color: var(--text-color);
+            transition: background 0.3s ease, color 0.3s ease;
         }
         
         @keyframes slideUp {
@@ -506,8 +525,22 @@
 </head>
 <body>
     <div class="container">
-        <h1>🎤 Speaker Separation</h1>
+        <!-- Header with Dark Mode Toggle -->
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
+            <h1>🎤 Speaker Separation</h1>
+            <button onclick="toggleDarkMode()" id="darkModeBtn" style="background: none; border: none; font-size: 24px; cursor: pointer;" title="Toggle Dark Mode">
+                🌙
+            </button>
+        </div>
         <p class="subtitle">Upload audio with multiple speakers and get individual voice tracks</p>
+        
+        <!-- Processing History (Quick access) -->
+        <div id="historyBar" style="display: none; margin-bottom: 20px; padding: 12px; background: var(--gray-50); border-radius: 8px;">
+            <div style="display: flex; justify-content: space-between; align-items: center;">
+                <span style="font-size: 14px; color: var(--text-color);">📋 Recent: <span id="historyCount">0</span> jobs</span>
+                <button onclick="showHistoryModal()" style="background: none; border: none; color: var(--primary); cursor: pointer; font-size: 14px;">View All →</button>
+            </div>
+        </div>
         
         <!-- Upload Section -->
         <div id="uploadSection">
@@ -518,8 +551,40 @@
                 <input type="file" id="fileInput" hidden accept="audio/*">
             </div>
             
+            <!-- Audio Preview Section (Quick Win #1) -->
+            <div id="audioPreviewSection" style="display: none; margin-top: 20px; padding: 20px; background: #f9fafb; border-radius: 12px;">
+                <h4 style="margin-bottom: 16px; display: flex; align-items: center; gap: 8px;">
+                    🎧 Preview Your Audio
+                </h4>
+                <audio controls id="previewPlayer" style="width: 100%; margin-bottom: 12px;"></audio>
+                <div style="display: flex; gap: 20px; margin-bottom: 16px; color: #6b7280; font-size: 14px;">
+                    <span>📁 Size: <strong id="previewFileSize">-</strong></span>
+                    <span>⏱️ Duration: <strong id="previewDuration">-</strong></span>
+                    <span>⏳ Est. Time: <strong id="previewEstimatedTime">-</strong></span>
+                </div>
+                <div style="display: flex; gap: 12px;">
+                    <button onclick="confirmUpload()" style="flex: 1; padding: 12px; background: #4F46E5; color: white; border: none; border-radius: 8px; cursor: pointer; font-weight: 600;">
+                        ✅ Proceed with Upload
+                    </button>
+                    <button onclick="cancelUpload()" style="padding: 12px 24px; background: #e5e7eb; color: #374151; border: none; border-radius: 8px; cursor: pointer; font-weight: 600;">
+                        Cancel
+                    </button>
+                </div>
+            </div>
+            
             <div class="settings">
                 <div class="settings-title">⚙️ Settings</div>
+                
+                <!-- Quality Preset Selector -->
+                <div class="setting-row">
+                    <span>Quality Preset</span>
+                    <select id="qualityPreset" onchange="updateQualityPreset()">
+                        <option value="fast">⚡ Fast (Lower Quality)</option>
+                        <option value="balanced" selected>⚖️ Balanced (Recommended)</option>
+                        <option value="high">🎯 High Quality (Slower)</option>
+                    </select>
+                </div>
+                
                 <div class="setting-row">
                     <span>Number of Speakers</span>
                     <input type="number" id="numSpeakers" value="2" min="2" max="10">
@@ -532,6 +597,30 @@
                         <option value="spectral">Spectral (Advanced)</option>
                     </select>
                 </div>
+                
+                <!-- Export Format Options -->
+                <div class="setting-row">
+                    <span>Export Format</span>
+                    <select id="exportFormat">
+                        <option value="wav">WAV (Highest Quality)</option>
+                        <option value="mp3">MP3 (Smaller Size)</option>
+                        <option value="flac">FLAC (Lossless)</option>
+                    </select>
+                </div>
+                
+                <!-- Noise Reduction Toggle -->
+                <div class="setting-row">
+                    <span>Noise Reduction</span>
+                    <label style="display: flex; align-items: center; gap: 8px; cursor: pointer;">
+                        <input type="checkbox" id="noiseReduction" checked style="width: 18px; height: 18px;">
+                        <span style="font-size: 13px; color: #6b7280;">Apply noise reduction (recommended)</span>
+                    </label>
+                </div>
+            </div>
+            
+            <!-- Keyboard Shortcuts Hint -->
+            <div style="text-align: center; margin-top: 16px; color: #9ca3af; font-size: 13px;">
+                Press <kbd style="background: #f3f4f6; padding: 2px 6px; border-radius: 4px;">?</kbd> for keyboard shortcuts
             </div>
             
             <div class="help-section">
@@ -590,6 +679,111 @@
         let currentJobId = null;
         let websocket = null;
         
+        // ============================================================================
+        // WebSocket Connection for Real-Time Progress
+        // ============================================================================
+        function connectWebSocket(jobId) {
+            // Close existing connection if any
+            if (websocket) {
+                websocket.close();
+            }
+            
+            // Determine WebSocket protocol
+            const wsProtocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+            const wsUrl = `${wsProtocol}//${window.location.host}/ws/progress/${jobId}`;
+            
+            websocket = new WebSocket(wsUrl);
+            
+            websocket.onopen = () => {
+                console.log('WebSocket connected for job:', jobId);
+            };
+            
+            websocket.onmessage = (event) => {
+                const data = JSON.parse(event.data);
+                
+                // Handle ping/pong
+                if (data.type === 'ping') {
+                    websocket.send('pong');
+                    return;
+                }
+                
+                // Update progress UI
+                updateProgressUI(data);
+            };
+            
+            websocket.onerror = (error) => {
+                console.error('WebSocket error:', error);
+            };
+            
+            websocket.onclose = () => {
+                console.log('WebSocket disconnected');
+            };
+        }
+        
+        function updateProgressUI(data) {
+            const progressBar = document.getElementById('progressBar');
+            const progressPercent = document.getElementById('progressPercent');
+            const stageText = document.getElementById('stageText');
+            const stageIcon = document.getElementById('stageIcon');
+            
+            // Update progress bar
+            if (data.progress !== undefined) {
+                progressBar.style.width = `${data.progress}%`;
+                progressPercent.textContent = `${data.progress}%`;
+            }
+            
+            // Update stage text
+            if (data.message) {
+                stageText.textContent = data.message;
+            }
+            
+            // Update stage icon based on stage
+            const stageIcons = {
+                'uploaded': '📁',
+                'diagnosed': '🔍',
+                'separating': '⚙️',
+                'separated': '✂️',
+                'cleaning': '🧹',
+                'completed': '✅',
+                'failed': '❌'
+            };
+            
+            if (data.stage && stageIcons[data.stage]) {
+                stageIcon.textContent = stageIcons[data.stage];
+            }
+            
+            // If completed, show results
+            if (data.stage === 'completed') {
+                fetchJobResults(data.job_id);
+            }
+            
+            // If failed, show error
+            if (data.stage === 'failed') {
+                showError({
+                    error: {
+                        icon: '❌',
+                        title: 'Processing Failed',
+                        message: data.message || 'An error occurred during processing',
+                        severity: 'error',
+                        can_retry: true
+                    }
+                });
+            }
+        }
+        
+        async function fetchJobResults(jobId) {
+            try {
+                const response = await fetch(`${API_BASE}/api/v1/jobs/${jobId}`);
+                const job = await response.json();
+                
+                if (job.status === 'completed' || job.status === 'separated') {
+                    displayResults(job);
+                }
+            } catch (error) {
+                console.error('Failed to fetch job results:', error);
+            }
+        }
+        
         // Upload area drag & drop
         const uploadArea = document.getElementById('uploadArea');
         const fileInput = document.getElementById('fileInput');
@@ -610,12 +804,12 @@
             uploadArea.classList.remove('dragging');
             
             const file = e.dataTransfer.files[0];
-            if (file) handleFileSelect(file);
+            if (file) showAudioPreview(file);  // Show preview first
         });
         
         fileInput.addEventListener('change', (e) => {
             const file = e.target.files[0];
-            if (file) handleFileSelect(file);
+            if (file) showAudioPreview(file);  // Show preview first instead of direct upload
         });
         
         async function handleFileSelect(file) {
@@ -685,6 +879,9 @@
                 }
                 
                 currentJobId = data.job_id;
+                
+                // Connect WebSocket for real-time progress
+                connectWebSocket(currentJobId);
                 
                 // Start diagnosis
                 await startDiagnosis(currentJobId);
@@ -825,6 +1022,9 @@
             document.getElementById('progressSection').classList.remove('active');
             document.getElementById('resultsSection').classList.add('active');
             
+            // Show success animation (Quick Win #3)
+            showSuccessAnimation();
+            
             const speakerCards = document.getElementById('speakerCards');
             speakerCards.innerHTML = '';
             
@@ -925,16 +1125,330 @@
         }
         
         async function downloadAll() {
-            alert('Download all speakers as ZIP - Coming soon!');
+            if (!currentJobId) {
+                alert('No job to download');
+                return;
+            }
+            
+            // Download ZIP file
+            window.location.href = `${API_BASE}/api/v1/jobs/${currentJobId}/download-all`;
         }
         
-        // Keyboard shortcuts
+        // ============================================================================
+        // Quick Win: Audio Preview Before Upload
+        // ============================================================================
+        let selectedFile = null;
+        
+        function showAudioPreview(file) {
+            selectedFile = file;
+            const previewSection = document.getElementById('audioPreviewSection');
+            const previewPlayer = document.getElementById('previewPlayer');
+            const fileSize = document.getElementById('previewFileSize');
+            const estimatedTime = document.getElementById('previewEstimatedTime');
+            
+            // Create object URL for preview
+            const url = URL.createObjectURL(file);
+            previewPlayer.src = url;
+            
+            // Show file info
+            fileSize.textContent = formatFileSize(file.size);
+            
+            // Get estimated processing time
+            fetch(`${API_BASE}/api/v1/estimate-time?file_size_bytes=${file.size}&num_speakers=2`)
+                .then(r => r.json())
+                .then(data => {
+                    estimatedTime.textContent = data.estimated_human;
+                })
+                .catch(() => {
+                    estimatedTime.textContent = '~1-2 min';
+                });
+            
+            previewSection.style.display = 'block';
+            
+            // Get audio duration
+            previewPlayer.onloadedmetadata = () => {
+                const duration = document.getElementById('previewDuration');
+                duration.textContent = formatDuration(previewPlayer.duration);
+            };
+        }
+        
+        function formatFileSize(bytes) {
+            if (bytes < 1024) return bytes + ' B';
+            if (bytes < 1024 * 1024) return (bytes / 1024).toFixed(1) + ' KB';
+            return (bytes / (1024 * 1024)).toFixed(1) + ' MB';
+        }
+        
+        function formatDuration(seconds) {
+            const mins = Math.floor(seconds / 60);
+            const secs = Math.floor(seconds % 60);
+            return `${mins}:${secs.toString().padStart(2, '0')}`;
+        }
+        
+        function confirmUpload() {
+            if (selectedFile) {
+                document.getElementById('audioPreviewSection').style.display = 'none';
+                handleFileSelect(selectedFile);
+            }
+        }
+        
+        function cancelUpload() {
+            selectedFile = null;
+            document.getElementById('audioPreviewSection').style.display = 'none';
+            document.getElementById('previewPlayer').src = '';
+        }
+        
+        // ============================================================================
+        // Quick Win: Success Animation (Confetti)
+        // ============================================================================
+        function showSuccessAnimation() {
+            // Create confetti particles
+            const colors = ['#4F46E5', '#10B981', '#F59E0B', '#EF4444', '#8B5CF6'];
+            
+            for (let i = 0; i < 100; i++) {
+                createConfetti(colors[i % colors.length]);
+            }
+        }
+        
+        function createConfetti(color) {
+            const confetti = document.createElement('div');
+            confetti.style.cssText = `
+                position: fixed;
+                width: 10px;
+                height: 10px;
+                background: ${color};
+                left: ${Math.random() * 100}vw;
+                top: -10px;
+                border-radius: ${Math.random() > 0.5 ? '50%' : '0'};
+                pointer-events: none;
+                z-index: 9999;
+                animation: confettiFall ${2 + Math.random() * 2}s linear forwards;
+            `;
+            document.body.appendChild(confetti);
+            
+            setTimeout(() => confetti.remove(), 4000);
+        }
+        
+        // Add confetti animation style
+        const confettiStyle = document.createElement('style');
+        confettiStyle.textContent = `
+            @keyframes confettiFall {
+                0% { transform: translateY(0) rotate(0deg); opacity: 1; }
+                100% { transform: translateY(100vh) rotate(720deg); opacity: 0; }
+            }
+        `;
+        document.head.appendChild(confettiStyle);
+        
+        // ============================================================================
+        // Quick Win: Keyboard Shortcuts Help
+        // ============================================================================
+        function showKeyboardShortcuts() {
+            const modal = document.createElement('div');
+            modal.id = 'shortcutsModal';
+            modal.style.cssText = `
+                position: fixed;
+                top: 0;
+                left: 0;
+                right: 0;
+                bottom: 0;
+                background: rgba(0,0,0,0.5);
+                display: flex;
+                align-items: center;
+                justify-content: center;
+                z-index: 10000;
+            `;
+            modal.innerHTML = `
+                <div style="background: white; padding: 30px; border-radius: 16px; max-width: 400px; width: 90%;">
+                    <h3 style="margin-bottom: 20px; font-size: 24px;">⌨️ Keyboard Shortcuts</h3>
+                    <ul style="list-style: none; padding: 0; line-height: 2;">
+                        <li><kbd style="background: #f3f4f6; padding: 4px 8px; border-radius: 4px; font-family: monospace;">Ctrl/Cmd + U</kbd> Upload file</li>
+                        <li><kbd style="background: #f3f4f6; padding: 4px 8px; border-radius: 4px; font-family: monospace;">Ctrl/Cmd + R</kbd> Reset / Process another</li>
+                        <li><kbd style="background: #f3f4f6; padding: 4px 8px; border-radius: 4px; font-family: monospace;">Esc</kbd> Close modals</li>
+                        <li><kbd style="background: #f3f4f6; padding: 4px 8px; border-radius: 4px; font-family: monospace;">?</kbd> Show this help</li>
+                    </ul>
+                    <button onclick="this.closest('#shortcutsModal').remove()" 
+                            style="margin-top: 20px; width: 100%; padding: 12px; background: #4F46E5; color: white; border: none; border-radius: 8px; cursor: pointer;">
+                        Got it!
+                    </button>
+                </div>
+            `;
+            document.body.appendChild(modal);
+            modal.addEventListener('click', (e) => {
+                if (e.target === modal) modal.remove();
+            });
+        }
+        
+        // Enhanced keyboard shortcuts
         document.addEventListener('keydown', (e) => {
+            // Ctrl/Cmd + U: Upload
             if ((e.ctrlKey || e.metaKey) && e.key === 'u') {
                 e.preventDefault();
                 fileInput.click();
             }
+            // Ctrl/Cmd + R: Reset
+            if ((e.ctrlKey || e.metaKey) && e.key === 'r') {
+                e.preventDefault();
+                resetApp();
+            }
+            // Escape: Close modals
+            if (e.key === 'Escape') {
+                const modal = document.getElementById('shortcutsModal');
+                const preview = document.getElementById('audioPreviewSection');
+                if (modal) modal.remove();
+                if (preview && preview.style.display !== 'none') cancelUpload();
+            }
+            // ?: Show help
+            if (e.key === '?' && !e.ctrlKey && !e.metaKey) {
+                showKeyboardShortcuts();
+            }
         });
+        
+        // ============================================================================
+        // Dark Mode Toggle
+        // ============================================================================
+        function toggleDarkMode() {
+            document.body.classList.toggle('dark-mode');
+            const isDark = document.body.classList.contains('dark-mode');
+            localStorage.setItem('darkMode', isDark);
+            document.getElementById('darkModeBtn').textContent = isDark ? '☀️' : '🌙';
+        }
+        
+        // Load dark mode preference
+        if (localStorage.getItem('darkMode') === 'true') {
+            document.body.classList.add('dark-mode');
+            document.getElementById('darkModeBtn').textContent = '☀️';
+        }
+        
+        // ============================================================================
+        // Quality Preset Selector
+        // ============================================================================
+        function updateQualityPreset() {
+            const preset = document.getElementById('qualityPreset').value;
+            const methodSelect = document.getElementById('method');
+            
+            const presets = {
+                'fast': { method: 'kmeans', description: 'Fast processing, lower accuracy' },
+                'balanced': { method: 'gmm', description: 'Good balance of speed and quality' },
+                'high': { method: 'spectral', description: 'Best quality, slower processing' }
+            };
+            
+            methodSelect.value = presets[preset].method;
+        }
+        
+        // ============================================================================
+        // Processing History (localStorage)
+        // ============================================================================
+        function saveToHistory(job) {
+            const history = JSON.parse(localStorage.getItem('processing_history') || '[]');
+            history.unshift({
+                job_id: job.job_id,
+                filename: job.filename,
+                timestamp: new Date().toISOString(),
+                num_speakers: job.num_speakers || 2,
+                status: job.status
+            });
+            // Keep last 20
+            localStorage.setItem('processing_history', JSON.stringify(history.slice(0, 20)));
+            updateHistoryBar();
+        }
+        
+        function updateHistoryBar() {
+            const history = JSON.parse(localStorage.getItem('processing_history') || '[]');
+            const historyBar = document.getElementById('historyBar');
+            const historyCount = document.getElementById('historyCount');
+            
+            if (history.length > 0) {
+                historyBar.style.display = 'block';
+                historyCount.textContent = history.length;
+            } else {
+                historyBar.style.display = 'none';
+            }
+        }
+        
+        function showHistoryModal() {
+            const history = JSON.parse(localStorage.getItem('processing_history') || '[]');
+            
+            const modal = document.createElement('div');
+            modal.id = 'historyModal';
+            modal.style.cssText = `
+                position: fixed;
+                top: 0;
+                left: 0;
+                right: 0;
+                bottom: 0;
+                background: rgba(0,0,0,0.5);
+                display: flex;
+                align-items: center;
+                justify-content: center;
+                z-index: 10000;
+            `;
+            
+            const historyHTML = history.length ? history.map(h => `
+                <div style="padding: 12px; border-bottom: 1px solid var(--gray-100); display: flex; justify-content: space-between; align-items: center;">
+                    <div>
+                        <div style="font-weight: 600;">${h.filename}</div>
+                        <div style="font-size: 12px; color: #6b7280;">${new Date(h.timestamp).toLocaleString()} • ${h.num_speakers} speakers</div>
+                    </div>
+                    <span style="padding: 4px 8px; border-radius: 4px; font-size: 12px; background: ${h.status === 'completed' ? '#dcfce7' : '#fef3c7'};">
+                        ${h.status}
+                    </span>
+                </div>
+            `).join('') : '<p style="padding: 20px; text-align: center; color: #6b7280;">No processing history yet</p>';
+            
+            modal.innerHTML = `
+                <div style="background: var(--container-bg); padding: 24px; border-radius: 16px; max-width: 500px; width: 90%; max-height: 80vh; overflow-y: auto;">
+                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px;">
+                        <h3 style="font-size: 20px;">📋 Processing History</h3>
+                        <button onclick="clearHistory()" style="background: none; border: none; color: #ef4444; cursor: pointer; font-size: 14px;">Clear All</button>
+                    </div>
+                    ${historyHTML}
+                    <button onclick="this.closest('#historyModal').remove()" 
+                            style="margin-top: 16px; width: 100%; padding: 12px; background: var(--primary); color: white; border: none; border-radius: 8px; cursor: pointer; font-weight: 600;">
+                        Close
+                    </button>
+                </div>
+            `;
+            document.body.appendChild(modal);
+            modal.addEventListener('click', (e) => {
+                if (e.target === modal) modal.remove();
+            });
+        }
+        
+        function clearHistory() {
+            localStorage.removeItem('processing_history');
+            updateHistoryBar();
+            document.getElementById('historyModal')?.remove();
+        }
+        
+        // Initialize history bar on load
+        updateHistoryBar();
+        
+        // ============================================================================
+        // Waveform Visualization (using WaveSurfer.js)
+        // ============================================================================
+        let wavesurfer = null;
+        
+        function initWaveform(file) {
+            const waveformContainer = document.getElementById('waveformContainer');
+            if (!waveformContainer) return;
+            
+            // Destroy existing instance
+            if (wavesurfer) {
+                wavesurfer.destroy();
+            }
+            
+            // Create WaveSurfer instance
+            wavesurfer = WaveSurfer.create({
+                container: '#waveformContainer',
+                waveColor: '#4F46E5',
+                progressColor: '#4338CA',
+                height: 80,
+                responsive: true
+            });
+            
+            // Load file
+            const url = URL.createObjectURL(file);
+            wavesurfer.load(url);
+        }
     </script>
 </body>
 </html>

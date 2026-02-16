@@ -199,7 +199,7 @@ app = FastAPI(
     version="2.0.0"
 )
 
-from fastapi import Request
+from fastapi import Request, WebSocket, WebSocketDisconnect
 from fastapi.responses import JSONResponse
 from error_handler import APIError, UserFriendlyErrorFormatter
 import uuid
@@ -307,18 +307,25 @@ if _STATIC_DIR.exists():
 try:
     from security_improvements import (
         verify_token, SecurityHeadersMiddleware,
-        AuditLogger, SecurityValidator
+        AuditLogger, SecurityValidator, RedisRateLimiter
     )
     
     app.add_middleware(SecurityHeadersMiddleware)
     audit_logger = AuditLogger()
     validator = SecurityValidator()
+    
+    # Initialize Redis rate limiter
+    redis_url = os.getenv('REDIS_URL', 'redis://localhost:6379')
+    rate_limiter = RedisRateLimiter(redis_url)
+    
     SECURITY_AVAILABLE = True
+    print("✓ Security features loaded: JWT, Rate Limiting, Audit Logging")
 except ImportError as e:
     print(f"⚠️  Security modules not available: {e}")
     SECURITY_AVAILABLE = False
     audit_logger = None
     validator = None
+    rate_limiter = None
 
 
 # ============================================================================
@@ -352,6 +359,86 @@ async def metrics():
             {"error": "prometheus_client not installed. Install with: pip install prometheus-client"},
             status_code=501
         )
+
+
+# ============================================================================
+# Authentication Endpoints
+# ============================================================================
+
+class LoginRequest(BaseModel):
+    username: str
+    password: str
+
+
+class TokenResponse(BaseModel):
+    access_token: str
+    token_type: str = "bearer"
+    expires_in: int
+
+
+@app.post("/api/v1/auth/login", response_model=TokenResponse)
+async def login(request: LoginRequest):
+    """Login endpoint to get JWT token"""
+    if not SECURITY_AVAILABLE:
+        raise HTTPException(status_code=501, detail="Authentication not available")
+    
+    from security_improvements import verify_password, create_access_token
+    from datetime import timedelta
+    
+    # In production, verify against database
+    # For demo, accept any username with password "demo123"
+    # TODO: Replace with actual user database
+    if request.password != "demo123":
+        if audit_logger:
+            audit_logger.log_auth_attempt(request.username, False)
+        raise HTTPException(
+            status_code=401, 
+            detail="Invalid credentials"
+        )
+    
+    # Create token
+    access_token = create_access_token(
+        data={"sub": request.username},
+        expires_delta=timedelta(minutes=config.JWT_EXPIRE_MINUTES)
+    )
+    
+    if audit_logger:
+        audit_logger.log_auth_attempt(request.username, True)
+    
+    return TokenResponse(
+        access_token=access_token,
+        token_type="bearer",
+        expires_in=config.JWT_EXPIRE_MINUTES * 60
+    )
+
+
+@app.get("/api/v1/auth/verify")
+async def verify_auth(user: dict = Depends(verify_token) if SECURITY_AVAILABLE else None):
+    """Verify if current token is valid"""
+    if not SECURITY_AVAILABLE:
+        raise HTTPException(status_code=501, detail="Authentication not available")
+    return {"valid": True, "user": user}
+
+
+@app.get("/api/v1/rate-limit/status")
+async def get_rate_limit_status(request: Request):
+    """Get current rate limit status for client"""
+    client_ip = request.client.host if request.client else "unknown"
+    
+    if rate_limiter and SECURITY_AVAILABLE:
+        remaining = rate_limiter.get_remaining(
+            f"upload:{client_ip}",
+            max_requests=config.RATE_LIMIT_UPLOADS,
+            window=config.RATE_LIMIT_WINDOW
+        )
+        return {
+            "client_ip": client_ip,
+            "remaining_uploads": remaining,
+            "max_uploads": config.RATE_LIMIT_UPLOADS,
+            "window_seconds": config.RATE_LIMIT_WINDOW
+        }
+    
+    return {"rate_limiting": "disabled"}
 
 
 # ============================================================================
@@ -421,16 +508,44 @@ def validate_file_size(file_size: int) -> bool:
 @handle_errors()
 async def upload_audio(
     background_tasks: BackgroundTasks,
+    request: Request,
     file: UploadFile = File(...)
 ):
     """Step 1: Upload audio file with comprehensive validation"""
     
+    # Get client IP for rate limiting
+    client_ip = request.client.host if request.client else "unknown"
+    
+    # Check rate limit
+    if rate_limiter and SECURITY_AVAILABLE:
+        if not rate_limiter.check_rate_limit(
+            f"upload:{client_ip}", 
+            max_requests=config.RATE_LIMIT_UPLOADS,
+            window=config.RATE_LIMIT_WINDOW
+        ):
+            remaining = rate_limiter.get_remaining(
+                f"upload:{client_ip}",
+                max_requests=config.RATE_LIMIT_UPLOADS,
+                window=config.RATE_LIMIT_WINDOW
+            )
+            raise ValidationError(
+                message="Rate limit exceeded",
+                field="rate_limit",
+                user_message=f"Too many uploads. Please wait before trying again. Remaining: {remaining}",
+                details={'remaining_requests': remaining}
+            )
+    
     with LogContext("file_upload", component="upload", job_id=None):
+        # Sanitize filename
+        safe_filename = validator.validate_filename(file.filename) if validator else file.filename
+        
         # Validate file type
         allowed_extensions = {'.mp3', '.wav', '.flac', '.ogg', '.m4a'}
-        file_ext = Path(file.filename).suffix.lower()
+        file_ext = Path(safe_filename).suffix.lower()
         
         if file_ext not in allowed_extensions:
+            if audit_logger:
+                audit_logger.log_upload_rejection(client_ip, safe_filename, f"Invalid file type: {file_ext}")
             raise ValidationError(
                 message=f"File extension validation failed: {file_ext}",
                 field="filename",
@@ -438,7 +553,7 @@ async def upload_audio(
                 details={
                     'uploaded_type': file_ext,
                     'supported_types': list(allowed_extensions),
-                    'filename': file.filename
+                    'filename': safe_filename
                 }
             )
         
@@ -450,7 +565,9 @@ async def upload_audio(
         # Validate file content is actually audio
         try:
             file_obj = type('obj', (object,), {'read': lambda: file_content, 'seek': lambda x: None})()
-            if not validator.is_valid_audio(file_obj):
+            if validator and not validator.is_valid_audio(file_obj):
+                if audit_logger:
+                    audit_logger.log_upload_rejection(client_ip, safe_filename, "Invalid audio content")
                 raise ValidationError(
                     "File content is not valid audio",
                     field="file",
@@ -483,7 +600,7 @@ async def upload_audio(
             'job_id': job_id,
             'status': JobStatus.UPLOADED,
             'created_at': datetime.utcnow().isoformat(),
-            'filename': file.filename,
+            'filename': safe_filename,
             'progress': 10,
             'progress_message': 'Uploaded. Ready to diagnose.',
             'file_path': str(upload_path),
@@ -496,13 +613,18 @@ async def upload_audio(
             'error': None
         }
         
+        # Log successful upload
+        if audit_logger:
+            audit_logger.log_file_upload(client_ip, safe_filename, file_size)
+        
         logger.info(
             "File uploaded successfully",
             extra={
                 'job_id': job_id,
-                'filename': file.filename,
+                'filename': safe_filename,
                 'file_size_mb': file_size / 1024 / 1024,
-                'file_type': file_ext
+                'file_type': file_ext,
+                'client_ip': client_ip
             },
             component='upload'
         )
@@ -713,10 +835,22 @@ async def diagnose_audio(audio_path: Path) -> DiagnosticReport:
 
 
 def _set_job_progress(job_id: str, progress: int, message: str):
-    """Helper function to update job progress"""
+    """Helper function to update job progress and broadcast via WebSocket"""
     if job_id in jobs_db:
         jobs_db[job_id]['progress'] = progress
         jobs_db[job_id]['progress_message'] = message
+        
+        # Broadcast progress via WebSocket (async-safe)
+        if job_id in active_websockets:
+            # Create task to broadcast (handles being called from sync context)
+            try:
+                loop = asyncio.get_event_loop()
+                if loop.is_running():
+                    asyncio.create_task(broadcast_progress(
+                        job_id, progress, jobs_db[job_id]['status'], message
+                    ))
+            except RuntimeError:
+                pass  # No event loop running
 
 
 # ============================================================================
@@ -841,6 +975,100 @@ async def health():
         "ollama": ollama_status,
         "ollama_url": config.OLLAMA_URL
     }
+
+
+# =============================================================================
+# WebSocket for Real-Time Progress Updates
+# =============================================================================
+
+# Store active WebSocket connections per job
+active_websockets: Dict[str, List[WebSocket]] = {}
+
+
+async def broadcast_progress(job_id: str, progress: int, stage: str, message: str):
+    """Broadcast progress update to all connected clients for a job"""
+    if job_id in active_websockets:
+        dead_connections = []
+        for ws in active_websockets[job_id]:
+            try:
+                await ws.send_json({
+                    "job_id": job_id,
+                    "progress": progress,
+                    "stage": stage,
+                    "message": message,
+                    "timestamp": datetime.utcnow().isoformat()
+                })
+            except Exception:
+                dead_connections.append(ws)
+        
+        # Clean up dead connections
+        for ws in dead_connections:
+            active_websockets[job_id].remove(ws)
+
+
+@app.websocket("/ws/progress/{job_id}")
+async def websocket_progress(websocket: WebSocket, job_id: str):
+    """WebSocket endpoint for real-time progress updates"""
+    await websocket.accept()
+    
+    # Add to active connections
+    if job_id not in active_websockets:
+        active_websockets[job_id] = []
+    active_websockets[job_id].append(websocket)
+    
+    try:
+        # Send initial status
+        if job_id in jobs_db:
+            job = jobs_db[job_id]
+            await websocket.send_json({
+                "job_id": job_id,
+                "progress": job.get('progress', 0),
+                "stage": job.get('status', 'unknown'),
+                "message": job.get('progress_message', ''),
+                "timestamp": datetime.utcnow().isoformat()
+            })
+        else:
+            await websocket.send_json({
+                "job_id": job_id,
+                "progress": 0,
+                "stage": "waiting",
+                "message": "Waiting for job to start...",
+                "timestamp": datetime.utcnow().isoformat()
+            })
+        
+        # Keep connection alive and handle incoming messages
+        while True:
+            try:
+                # Wait for any message from client (ping/pong)
+                data = await asyncio.wait_for(websocket.receive_text(), timeout=30.0)
+                
+                # If client requests status, send it
+                if data == "status" and job_id in jobs_db:
+                    job = jobs_db[job_id]
+                    await websocket.send_json({
+                        "job_id": job_id,
+                        "progress": job.get('progress', 0),
+                        "stage": job.get('status', 'unknown'),
+                        "message": job.get('progress_message', ''),
+                        "timestamp": datetime.utcnow().isoformat()
+                    })
+                    
+            except asyncio.TimeoutError:
+                # Send ping to keep connection alive
+                try:
+                    await websocket.send_json({"type": "ping"})
+                except Exception:
+                    break
+                    
+    except WebSocketDisconnect:
+        pass
+    finally:
+        # Remove from active connections
+        if job_id in active_websockets:
+            if websocket in active_websockets[job_id]:
+                active_websockets[job_id].remove(websocket)
+            if not active_websockets[job_id]:
+                del active_websockets[job_id]
 
 
 @app.get("/final_speaker_frontend.html")
@@ -1203,6 +1431,115 @@ async def download_file(job_id: str, file_type: str, filename: str, inline: bool
         media_type="audio/wav",
         filename=filename
     )
+
+
+# ============================================================================
+# Quick Win: Download All as ZIP
+# ============================================================================
+
+import zipfile
+from io import BytesIO
+
+@app.get("/api/v1/jobs/{job_id}/download-all")
+async def download_all_speakers(job_id: str):
+    """Download all separated speakers as a ZIP file"""
+    
+    if job_id not in jobs_db:
+        raise NotFoundError("Job", job_id)
+    
+    job = jobs_db[job_id]
+    
+    if job['status'] not in [JobStatus.SEPARATED, JobStatus.COMPLETED]:
+        raise ValidationError(
+            "Job not ready for download",
+            field="status",
+            user_message="Processing is not complete. Please wait for the job to finish."
+        )
+    
+    # Find output directory
+    output_path = OUTPUT_DIR / job_id
+    if not output_path.exists():
+        raise NotFoundError("Output directory", job_id)
+    
+    # Create ZIP in memory
+    zip_buffer = BytesIO()
+    
+    with zipfile.ZipFile(zip_buffer, 'w', zipfile.ZIP_DEFLATED) as zip_file:
+        # Add separated speaker files
+        separated_path = output_path / "separated"
+        if separated_path.exists():
+            for audio_file in separated_path.glob("*.wav"):
+                zip_file.write(audio_file, f"separated/{audio_file.name}")
+        
+        # Add cleaned files if available
+        cleaned_path = output_path / "cleaned"
+        if cleaned_path.exists():
+            for audio_file in cleaned_path.glob("*.wav"):
+                zip_file.write(audio_file, f"cleaned/{audio_file.name}")
+        
+        # Add analysis report if available
+        analysis_path = output_path / "analysis.json"
+        if analysis_path.exists():
+            zip_file.write(analysis_path, "analysis.json")
+    
+    zip_buffer.seek(0)
+    
+    # Generate filename from original
+    original_name = Path(job['filename']).stem
+    
+    return StreamingResponse(
+        zip_buffer,
+        media_type="application/zip",
+        headers={
+            "Content-Disposition": f"attachment; filename={original_name}_speakers_{job_id[:8]}.zip"
+        }
+    )
+
+
+# ============================================================================
+# Quick Win: Estimated Processing Time
+# ============================================================================
+
+@app.get("/api/v1/estimate-time")
+async def estimate_processing_time(
+    file_size_bytes: int = Query(..., description="File size in bytes"),
+    num_speakers: int = Query(2, description="Number of speakers"),
+    include_cleaning: bool = Query(False, description="Include audio cleaning time")
+):
+    """Estimate processing time based on file size and options"""
+    
+    # Base processing time (seconds)
+    base_time = 10
+    
+    # Time per MB of audio
+    size_mb = file_size_bytes / (1024 * 1024)
+    size_time = size_mb * 2  # ~2 seconds per MB
+    
+    # Time per speaker
+    speaker_time = num_speakers * 5
+    
+    # Cleaning time
+    cleaning_time = 15 if include_cleaning else 0
+    
+    total_seconds = base_time + size_time + speaker_time + cleaning_time
+    
+    # Add buffer for uncertainty
+    buffer = total_seconds * 0.2
+    
+    estimated_min = int(total_seconds - buffer)
+    estimated_max = int(total_seconds + buffer)
+    
+    return {
+        "estimated_seconds": int(total_seconds),
+        "estimated_min_seconds": max(10, estimated_min),
+        "estimated_max_seconds": estimated_max,
+        "estimated_human": f"{int(total_seconds // 60)}m {int(total_seconds % 60)}s" if total_seconds >= 60 else f"{int(total_seconds)}s",
+        "factors": {
+            "file_size_mb": round(size_mb, 2),
+            "num_speakers": num_speakers,
+            "include_cleaning": include_cleaning
+        }
+    }
 
 
 @app.post("/api/v1/jobs/{job_id}/feedback", response_model=JobResponse)

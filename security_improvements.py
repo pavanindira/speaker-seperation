@@ -144,14 +144,97 @@ class APIKeyManager:
 
 
 # =============================================================================
-# 4. RATE LIMITING (Enhanced with tiers)
+# 4. RATE LIMITING (Enhanced with Redis support)
 # =============================================================================
 
 from collections import defaultdict
 from threading import Lock
+from typing import Optional
+
+# Try to import Redis
+try:
+    import redis
+    REDIS_AVAILABLE = True
+except ImportError:
+    REDIS_AVAILABLE = False
+    print("⚠️  redis not installed. Using in-memory rate limiting.")
+    print("   Install with: pip install redis")
+
+
+class RedisRateLimiter:
+    """Redis-backed rate limiter for distributed systems"""
+    
+    def __init__(self, redis_url: str = 'redis://localhost:6379'):
+        self.redis_client = None
+        self.fallback_limiter = None
+        
+        if REDIS_AVAILABLE:
+            try:
+                self.redis_client = redis.from_url(redis_url)
+                # Test connection
+                self.redis_client.ping()
+                print("✓ Redis rate limiter connected")
+            except Exception as e:
+                print(f"⚠️  Redis connection failed: {e}")
+                print("   Falling back to in-memory rate limiting")
+                self.redis_client = None
+        
+        if not self.redis_client:
+            self.fallback_limiter = EnhancedRateLimiter()
+    
+    def check_rate_limit(self, key: str, max_requests: int = 10, window: int = 3600) -> bool:
+        """Check if request is within rate limit"""
+        if self.redis_client:
+            return self._check_redis(key, max_requests, window)
+        return self.fallback_limiter.check_rate_limit(key, 'free')
+    
+    def _check_redis(self, key: str, max_requests: int, window: int) -> bool:
+        """Redis-based rate limiting with sliding window"""
+        try:
+            current_time = datetime.utcnow().timestamp()
+            window_start = current_time - window
+            
+            pipe = self.redis_client.pipeline()
+            
+            # Remove old entries
+            pipe.zremrangebyscore(f"rate_limit:{key}", 0, window_start)
+            
+            # Count current entries
+            pipe.zcard(f"rate_limit:{key}")
+            
+            # Add current request
+            pipe.zadd(f"rate_limit:{key}", {str(current_time): current_time})
+            
+            # Set expiry
+            pipe.expire(f"rate_limit:{key}", window)
+            
+            results = pipe.execute()
+            current_count = results[1]
+            
+            return current_count < max_requests
+        except Exception as e:
+            print(f"⚠️  Redis rate limit error: {e}")
+            return True  # Allow on error
+    
+    def get_remaining(self, key: str, max_requests: int = 10, window: int = 3600) -> int:
+        """Get remaining requests for a key"""
+        if self.redis_client:
+            try:
+                current_time = datetime.utcnow().timestamp()
+                window_start = current_time - window
+                
+                # Clean and count
+                self.redis_client.zremrangebyscore(f"rate_limit:{key}", 0, window_start)
+                current_count = self.redis_client.zcard(f"rate_limit:{key}")
+                
+                return max(0, max_requests - current_count)
+            except Exception:
+                return max_requests
+        return max_requests
+
 
 class EnhancedRateLimiter:
-    """Rate limiter with different tiers"""
+    """In-memory rate limiter with different tiers (fallback)"""
     
     def __init__(self):
         self.requests = defaultdict(list)
@@ -186,6 +269,22 @@ class EnhancedRateLimiter:
             # Add current request
             self.requests[user_id].append(now)
             return True
+    
+    def get_remaining(self, user_id: str, tier: str = 'free') -> int:
+        """Get remaining requests for a user"""
+        with self.lock:
+            now = datetime.utcnow().timestamp()
+            limits = self.tiers.get(tier, self.tiers['free'])
+            window = limits['window']
+            max_requests = limits['uploads']
+            
+            # Clean old requests
+            self.requests[user_id] = [
+                ts for ts in self.requests[user_id]
+                if now - ts < window
+            ]
+            
+            return max(0, max_requests - len(self.requests[user_id]))
 
 
 # =============================================================================

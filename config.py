@@ -90,6 +90,16 @@ class Config:
         self.ENABLE_AUTH = os.getenv('ENABLE_AUTH', 'false').lower() == 'true'
         self.API_KEY = os.getenv('API_KEY', '')
         
+        # JWT Configuration
+        self.JWT_SECRET_KEY = os.getenv('JWT_SECRET_KEY', '')
+        self.JWT_ALGORITHM = os.getenv('JWT_ALGORITHM', 'HS256')
+        self.JWT_EXPIRE_MINUTES = int(os.getenv('JWT_EXPIRE_MINUTES', '60'))
+        
+        # Redis Configuration
+        self.REDIS_URL = os.getenv('REDIS_URL', 'redis://localhost:6379')
+        self.RATE_LIMIT_UPLOADS = int(os.getenv('RATE_LIMIT_UPLOADS', '10'))
+        self.RATE_LIMIT_WINDOW = int(os.getenv('RATE_LIMIT_WINDOW', '3600'))  # 1 hour
+        
         # Development Settings
         self.AUTO_RELOAD = os.getenv('AUTO_RELOAD', 'false').lower() == 'true'
         self.DEBUG = os.getenv('DEBUG', 'false').lower() == 'true'
@@ -153,6 +163,11 @@ class Config:
         print("\n🔒 Security:")
         print(f"  CORS Origins: {', '.join(self.CORS_ORIGINS)}")
         print(f"  Auth Enabled: {self.ENABLE_AUTH}")
+        print(f"  JWT Configured: {'Yes' if self.JWT_SECRET_KEY else 'No'}")
+        
+        print("\n📦 Redis:")
+        print(f"  URL: {self.REDIS_URL}")
+        print(f"  Rate Limit: {self.RATE_LIMIT_UPLOADS} uploads per {self.RATE_LIMIT_WINDOW}s")
         
         print("\n" + "=" * 60 + "\n")
 
