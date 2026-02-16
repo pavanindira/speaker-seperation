@@ -29,7 +29,7 @@ from logger_wrapper import (
 from error_handler import (
     ValidationError, NotFoundError, FileSizeError, ProcessingError,
     OllamaError, TimeoutError, ErrorRecoveryHandler, handle_errors,
-    retry_with_backoff, timeout_handler
+    retry_with_backoff, timeout_handler, RetryConfig
 )
 
 # ============================================================================
@@ -636,7 +636,7 @@ async def upload_audio(
 # ============================================================================
 
 @timeout_handler(timeout_seconds=120)
-@retry_with_backoff(max_attempts=2)
+@retry_with_backoff(RetryConfig(max_attempts=2))
 async def get_ollama_diagnostic_analysis(duration, speaking_time, estimated_speakers, 
                                         mean_pitch, quality, issues) -> str:
     """Get Ollama's analysis with timeout and retry"""
