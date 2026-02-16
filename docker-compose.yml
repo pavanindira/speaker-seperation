@@ -21,7 +21,10 @@ services:
       - ./final_speaker_api.py:/app/final_speaker_api.py:ro
       - ./audio_cleaner.py:/app/audio_cleaner.py:ro
       - ./improved_speaker_separator.py:/app/improved_speaker_separator.py:ro
-      - ./final_speaker_frontend.py:/app/final_speaker_frontend.py:ro
+      - ./logger_wrapper.py:/app/logger_wrapper.py:ro
+      - ./error_handler.py:/app/error_handler.py:ro
+      - ./security_improvements.py:/app/security_improvements.py:ro
+      - ./monitoring_observability.py:/app/monitoring_observability.py:ro
     environment:
       - OLLAMA_URL=${OLLAMA_URL:-http://192.168.1.33:11434}
       - API_PORT=8900

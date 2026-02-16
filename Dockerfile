@@ -21,7 +21,12 @@ COPY config.py .
 COPY requirements.txt .
 COPY templates ./templates
 COPY static ./static
-COPY .env ./.env
+COPY .env.example ./.env
+COPY logger_wrapper.py .
+COPY error_handler.py .
+COPY security_improvements.py .
+COPY monitoring_observability.py .
+
 
 # Install Python dependencies
 RUN pip install --no-cache-dir -r requirements.txt

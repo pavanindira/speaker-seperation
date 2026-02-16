@@ -3,8 +3,23 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Speaker Separation - Complete Workflow</title>
+    <meta name="description" content="Separate multiple speakers from audio recordings instantly">
+    <title>Speaker Separation - Split Voices Instantly</title>
+    <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🎤</text></svg>">
+    
     <style>
+        :root {
+            --primary: #4F46E5;
+            --primary-dark: #4338CA;
+            --success: #10B981;
+            --error: #EF4444;
+            --warning: #F59E0B;
+            --gray-50: #F9FAFB;
+            --gray-100: #F3F4F6;
+            --gray-800: #1F2937;
+            --shadow-lg: 0 10px 15px -3px rgba(0, 0, 0, 0.1);
+        }
+        
         * {
             margin: 0;
             padding: 0;
@@ -15,489 +30,486 @@
             font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
             background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
             min-height: 100vh;
-            padding: 2rem;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 20px;
         }
         
         .container {
-            max-width: 1000px;
-            margin: 0 auto;
             background: white;
             border-radius: 20px;
-            padding: 2rem;
-            box-shadow: 0 20px 60px rgba(0,0,0,0.3);
+            box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.25);
+            max-width: 700px;
+            width: 100%;
+            padding: 40px;
+            animation: slideUp 0.5s ease-out;
         }
         
+        @keyframes slideUp {
+            from { opacity: 0; transform: translateY(30px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+        
+        /* Header */
         h1 {
-            color: #667eea;
-            margin-bottom: 0.5rem;
-        }
-        
-        .workflow-steps {
-            display: flex;
-            justify-content: space-between;
-            margin: 2rem 0;
-            position: relative;
-        }
-        
-        .workflow-steps::before {
-            content: '';
-            position: absolute;
-            top: 20px;
-            left: 0;
-            right: 0;
-            height: 2px;
-            background: #e0e0e0;
-            z-index: 0;
-        }
-        
-        .step {
-            display: flex;
-            flex-direction: column;
-            align-items: center;
-            position: relative;
-            z-index: 1;
-        }
-        
-        .step-number {
-            width: 40px;
-            height: 40px;
-            border-radius: 50%;
-            background: #e0e0e0;
-            color: #999;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            font-weight: bold;
-            margin-bottom: 0.5rem;
-        }
-        
-        .step.active .step-number {
-            background: #667eea;
-            color: white;
-        }
-        
-        .step.completed .step-number {
-            background: #10b981;
-            color: white;
-        }
-        
-        .step-label {
-            font-size: 0.8rem;
-            color: #666;
+            font-size: 32px;
+            color: var(--gray-800);
+            margin-bottom: 8px;
             text-align: center;
         }
         
-        .section {
-            display: none;
-            margin: 2rem 0;
+        .subtitle {
+            text-align: center;
+            color: #6B7280;
+            margin-bottom: 30px;
+            font-size: 16px;
         }
         
-        .section.active {
-            display: block;
-        }
-        
+        /* Upload Area */
         .upload-area {
-            border: 3px dashed #667eea;
-            border-radius: 10px;
-            padding: 3rem;
+            border: 3px dashed #D1D5DB;
+            border-radius: 12px;
+            padding: 40px;
             text-align: center;
             cursor: pointer;
             transition: all 0.3s;
-            background: #f8f9ff;
+            background: var(--gray-50);
         }
         
         .upload-area:hover {
-            background: #eef1ff;
-            border-color: #764ba2;
+            border-color: var(--primary);
+            background: #EEF2FF;
         }
         
-        .upload-area.drag-over {
-            background: #e0e7ff;
-            border-color: #764ba2;
+        .upload-area.dragging {
+            border-color: var(--primary);
+            background: #EEF2FF;
+            transform: scale(1.02);
         }
         
-        input[type="file"] {
+        .upload-icon {
+            font-size: 48px;
+            margin-bottom: 16px;
+        }
+        
+        .upload-text {
+            font-size: 18px;
+            color: var(--gray-800);
+            margin-bottom: 8px;
+        }
+        
+        .upload-hint {
+            font-size: 14px;
+            color: #6B7280;
+        }
+        
+        /* Progress */
+        .progress-section {
             display: none;
+            margin-top: 30px;
         }
         
-        button {
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-            color: white;
-            border: none;
-            padding: 0.75rem 2rem;
-            border-radius: 8px;
-            font-size: 1rem;
-            font-weight: 600;
-            cursor: pointer;
-            transition: transform 0.2s;
-            margin: 0.5rem;
-        }
-        
-        button:hover:not(:disabled) {
-            transform: translateY(-2px);
-        }
-        
-        button:disabled {
-            opacity: 0.5;
-            cursor: not-allowed;
-        }
-        
-        button.secondary {
-            background: #6b7280;
-        }
-        
-        .diagnostic-report {
-            background: #f8f9ff;
-            padding: 1.5rem;
-            border-radius: 10px;
-            margin: 1rem 0;
-        }
-        
-        .metric {
-            display: flex;
-            justify-content: space-between;
-            padding: 0.5rem 0;
-            border-bottom: 1px solid #e0e0e0;
-        }
-        
-        .metric:last-child {
-            border-bottom: none;
-        }
-        
-        .metric-label {
-            font-weight: 600;
-            color: #666;
-        }
-        
-        .metric-value {
-            color: #333;
-        }
-        
-        .quality-excellent { color: #10b981; }
-        .quality-good { color: #f59e0b; }
-        .quality-poor { color: #ef4444; }
-        
-        .issues {
-            background: #fee2e2;
-            border-left: 4px solid #ef4444;
-            padding: 1rem;
-            margin: 1rem 0;
-            border-radius: 4px;
-        }
-        
-        .recommendations {
-            background: #dbeafe;
-            border-left: 4px solid #3b82f6;
-            padding: 1rem;
-            margin: 1rem 0;
-            border-radius: 4px;
-        }
-        
-        .ollama-analysis {
-            background: #fef3c7;
-            border-left: 4px solid #f59e0b;
-            padding: 1rem;
-            margin: 1rem 0;
-            border-radius: 4px;
-        }
-        
-        .file-list {
-            margin: 1rem 0;
-        }
-        
-        .file-item {
-            background: #f8f9ff;
-            padding: 1rem;
-            margin: 0.5rem 0;
-            border-radius: 8px;
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-        }
-        
-        .download-btn {
-            background: #10b981;
-            padding: 0.5rem 1rem;
-            color: white;
-            text-decoration: none;
-            border-radius: 6px;
-            font-size: 0.9rem;
-        }
-        
-        .download-btn:hover {
-            background: #059669;
-        }
-        
-        .progress {
-            display: none;
-            margin: 2rem 0;
-        }
-        
-        .progress.active {
+        .progress-section.active {
             display: block;
         }
         
-        .progress-bar {
-            width: 100%;
-            height: 8px;
-            background: #e0e0e0;
-            border-radius: 4px;
-            overflow: hidden;
+        .stage-indicator {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            margin-bottom: 20px;
         }
         
-        .progress-fill {
-            height: 100%;
-            background: linear-gradient(90deg, #667eea 0%, #764ba2 100%);
-            transition: width 0.3s;
-            animation: pulse 1.5s ease-in-out infinite;
+        .stage-icon {
+            font-size: 48px;
+            margin-right: 16px;
+            animation: pulse 2s infinite;
         }
         
         @keyframes pulse {
-            0%, 100% { opacity: 1; }
-            50% { opacity: 0.7; }
+            0%, 100% { transform: scale(1); }
+            50% { transform: scale(1.1); }
         }
         
-        .status {
-            margin-top: 1rem;
-            padding: 1rem;
+        .stage-text {
+            font-size: 18px;
+            color: var(--gray-800);
+            font-weight: 500;
+        }
+        
+        .progress-bar-container {
+            background: var(--gray-100);
+            border-radius: 10px;
+            height: 12px;
+            overflow: hidden;
+            margin-bottom: 12px;
+        }
+        
+        .progress-bar {
+            background: linear-gradient(90deg, var(--primary), var(--primary-dark));
+            height: 100%;
+            width: 0%;
+            transition: width 0.5s ease;
+        }
+        
+        .progress-percent {
+            text-align: center;
+            font-size: 14px;
+            color: #6B7280;
+            font-weight: 500;
+        }
+        
+        /* Results */
+        .results-section {
+            display: none;
+            margin-top: 30px;
+        }
+        
+        .results-section.active {
+            display: block;
+        }
+        
+        .success-message {
+            background: #ECFDF5;
+            border: 2px solid var(--success);
+            border-radius: 12px;
+            padding: 20px;
+            text-align: center;
+            margin-bottom: 24px;
+        }
+        
+        .success-icon {
+            font-size: 48px;
+            margin-bottom: 12px;
+        }
+        
+        .speaker-card {
+            background: var(--gray-50);
+            border-radius: 12px;
+            padding: 20px;
+            margin-bottom: 16px;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            transition: all 0.3s;
+        }
+        
+        .speaker-card:hover {
+            background: var(--gray-100);
+            transform: translateY(-2px);
+        }
+        
+        .speaker-info {
+            display: flex;
+            align-items: center;
+            flex: 1;
+        }
+        
+        .speaker-icon {
+            font-size: 32px;
+            margin-right: 16px;
+        }
+        
+        .speaker-title {
+            font-size: 16px;
+            font-weight: 600;
+            color: var(--gray-800);
+            margin-bottom: 4px;
+        }
+        
+        .speaker-stats {
+            font-size: 14px;
+            color: #6B7280;
+        }
+        
+        /* Buttons */
+        .btn {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            padding: 12px 24px;
             border-radius: 8px;
-            background: #f0f0f0;
+            font-size: 16px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s;
+            border: none;
+            text-decoration: none;
+        }
+        
+        .btn-primary {
+            background: var(--primary);
+            color: white;
+        }
+        
+        .btn-primary:hover {
+            background: var(--primary-dark);
+            transform: translateY(-2px);
+        }
+        
+        .btn-secondary {
+            background: white;
+            color: var(--gray-800);
+            border: 2px solid #E5E7EB;
+        }
+        
+        .download-btn {
+            background: var(--success);
+            color: white;
+            padding: 10px 20px;
+            border-radius: 8px;
+            font-size: 14px;
+        }
+        
+        /* Error */
+        .error-message {
+            background: #FEE2E2;
+            border: 2px solid var(--error);
+            border-radius: 12px;
+            padding: 20px;
+            margin-top: 20px;
+            display: none;
+        }
+        
+        .error-message.active {
+            display: block;
+        }
+        
+        .error-icon {
+            font-size: 48px;
+            text-align: center;
+            margin-bottom: 12px;
+        }
+        
+        .error-title {
+            font-size: 18px;
+            font-weight: 600;
+            color: var(--gray-800);
+            margin-bottom: 8px;
             text-align: center;
         }
         
-        select, input[type="number"] {
-            padding: 0.75rem;
-            border: 2px solid #e0e0e0;
-            border-radius: 8px;
-            font-size: 1rem;
-            margin: 0.5rem;
+        .error-text {
+            font-size: 14px;
+            color: #6B7280;
+            text-align: center;
+            margin-bottom: 16px;
         }
         
-        .config-options {
-            display: grid;
-            grid-template-columns: 1fr 1fr;
-            gap: 1rem;
-            margin: 1rem 0;
+        .error-actions {
+            display: flex;
+            gap: 12px;
+            justify-content: center;
+            flex-wrap: wrap;
         }
         
-        .checkbox-group {
+        /* Settings */
+        .settings {
+            margin-top: 24px;
+            padding-top: 24px;
+            border-top: 2px solid var(--gray-100);
+        }
+        
+        .settings-title {
+            font-size: 16px;
+            font-weight: 600;
+            color: var(--gray-800);
+            margin-bottom: 16px;
+        }
+        
+        .setting-row {
             display: flex;
             align-items: center;
-            gap: 0.5rem;
-            margin: 0.5rem 0;
+            justify-content: space-between;
+            margin-bottom: 16px;
         }
         
-        textarea {
-            width: 100%;
-            padding: 1rem;
-            border: 2px solid #e0e0e0;
+        select, input[type="number"] {
+            padding: 8px 12px;
+            border: 2px solid #E5E7EB;
             border-radius: 8px;
-            font-family: inherit;
-            font-size: 1rem;
-            min-height: 100px;
-            resize: vertical;
+            font-size: 14px;
         }
         
-        .rating {
-            display: flex;
-            gap: 0.5rem;
-            justify-content: center;
-            margin: 1rem 0;
-        }
-        
-        .star {
-            font-size: 2rem;
-            cursor: pointer;
-            color: #e0e0e0;
-            transition: color 0.2s;
-        }
-        
-        .star:hover, .star.active {
-            color: #fbbf24;
-        }
-        
-        .error {
-            background: #fee2e2;
-            color: #991b1b;
-            padding: 1rem;
+        /* Help Section */
+        .help-section {
+            background: #EEF2FF;
+            border-left: 4px solid var(--primary);
+            padding: 20px;
+            margin: 20px 0;
             border-radius: 8px;
-            margin: 1rem 0;
         }
         
-        .debug-info {
-            background: #f3f4f6;
-            padding: 1rem;
-            margin: 1rem 0;
-            border-radius: 8px;
-            font-family: monospace;
-            font-size: 0.85rem;
-            max-height: 200px;
-            overflow-y: auto;
+        .help-section h3 {
+            margin-bottom: 12px;
+            color: var(--gray-800);
+        }
+        
+        .help-section ul {
+            list-style: none;
+            padding-left: 0;
+        }
+        
+        .help-section li {
+            margin-bottom: 8px;
+            padding-left: 24px;
+            position: relative;
+        }
+        
+        .help-section li::before {
+            content: "✓";
+            position: absolute;
+            left: 0;
+            color: var(--success);
+            font-weight: bold;
+        }
+        
+        /* Mobile */
+        @media (max-width: 768px) {
+            .container {
+                padding: 20px;
+            }
+            
+            h1 {
+                font-size: 24px;
+            }
+            
+            .upload-area {
+                padding: 30px 20px;
+            }
+            
+            .speaker-card {
+                flex-direction: column;
+            }
+            
+            .speaker-info {
+                flex-direction: column;
+                margin-bottom: 12px;
+                text-align: center;
+            }
+            
+            .setting-row {
+                flex-direction: column;
+                align-items: stretch;
+                gap: 8px;
+            }
+            
+            .btn {
+                width: 100%;
+            }
         }
     </style>
 </head>
 <body>
     <div class="container">
-        <h1>🎤 Speaker Separation System</h1>
-        <p class="subtitle">Complete workflow with AI assistance</p>
+        <h1>🎤 Speaker Separation</h1>
+        <p class="subtitle">Upload audio with multiple speakers and get individual voice tracks</p>
         
-        <!-- Workflow Steps -->
-        <div class="workflow-steps">
-            <div class="step" id="step-1">
-                <div class="step-number">1</div>
-                <div class="step-label">Upload</div>
-            </div>
-            <div class="step" id="step-2">
-                <div class="step-number">2</div>
-                <div class="step-label">Diagnose</div>
-            </div>
-            <div class="step" id="step-3">
-                <div class="step-number">3</div>
-                <div class="step-label">Separate</div>
-            </div>
-            <div class="step" id="step-4">
-                <div class="step-number">4</div>
-                <div class="step-label">Download</div>
-            </div>
-            <div class="step" id="step-5">
-                <div class="step-number">5</div>
-                <div class="step-label">Clean</div>
-            </div>
-            <div class="step" id="step-6">
-                <div class="step-number">6</div>
-                <div class="step-label">Feedback</div>
-            </div>
-        </div>
-        
-        <!-- Debug info -->
-        <div id="debugInfo" class="debug-info" style="display: none;"></div>
-        
-        <!-- Section 1: Upload -->
-        <div class="section active" id="section-upload">
-            <h2>Step 1: Upload Audio File</h2>
+        <!-- Upload Section -->
+        <div id="uploadSection">
             <div class="upload-area" id="uploadArea">
-                <input type="file" id="fileInput" accept="audio/*">
-                <div>
-                    <h2>📁 Drop your audio file here</h2>
-                    <p>or click to browse</p>
-                    <p style="color: #999; margin-top: 1rem;">Supported: MP3, WAV, FLAC, OGG, M4A</p>
-                </div>
+                <div class="upload-icon">📁</div>
+                <div class="upload-text">Drop your audio file here</div>
+                <div class="upload-hint">or click to browse • MP3, WAV, M4A • Max 100MB</div>
+                <input type="file" id="fileInput" hidden accept="audio/*">
             </div>
-        </div>
-        
-        <!-- Section 2: Diagnostic -->
-        <div class="section" id="section-diagnostic">
-            <h2>Step 2: Diagnostic Report</h2>
-            <div id="diagnosticReport"></div>
-            <div class="config-options">
-                <div>
-                    <label>Number of Speakers:</label>
-                    <input type="number" id="numSpeakers" min="2" max="10" value="2">
+            
+            <div class="settings">
+                <div class="settings-title">⚙️ Settings</div>
+                <div class="setting-row">
+                    <span>Number of Speakers</span>
+                    <input type="number" id="numSpeakers" value="2" min="2" max="10">
                 </div>
-                <div>
-                    <label>Method:</label>
+                <div class="setting-row">
+                    <span>Method</span>
                     <select id="method">
                         <option value="gmm">GMM (Recommended)</option>
-                        <option value="kmeans">K-means (Fast)</option>
+                        <option value="kmeans">K-Means (Faster)</option>
                         <option value="spectral">Spectral (Advanced)</option>
                     </select>
                 </div>
             </div>
-            <button onclick="proceedWithSeparation()">✓ Proceed with Separation</button>
-            <button class="secondary" onclick="cancelJob()">✗ Cancel</button>
-        </div>
-        
-        <!-- Section 3: Separation Progress -->
-        <div class="section" id="section-separating">
-            <h2>Step 3: Separating Speakers</h2>
-            <div class="progress active">
-                <div class="progress-bar">
-                    <div class="progress-fill" style="width: 100%"></div>
-                </div>
-                <div class="status" id="separationStatus">Processing audio...</div>
-            </div>
-        </div>
-        
-        <!-- Section 4: Download Separated Files -->
-        <div class="section" id="section-download">
-            <h2>Step 4: Download Separated Files</h2>
-            <p>Your audio has been separated into individual speakers:</p>
-            <div class="file-list" id="separatedFiles"></div>
-            <button onclick="showCleaningSection()">🧹 Clean These Files</button>
-            <button class="secondary" onclick="skipToFeedback()">Skip to Feedback</button>
-        </div>
-        
-        <!-- Section 5: Cleaning -->
-        <div class="section" id="section-cleaning">
-            <h2>Step 5: Clean Audio Files</h2>
-            <p>Select cleaning options:</p>
-            <div class="checkbox-group">
-                <input type="checkbox" id="removeSilence" checked>
-                <label for="removeSilence">Remove silence (30-50% shorter)</label>
-            </div>
-            <div class="checkbox-group">
-                <input type="checkbox" id="reduceNoise" checked>
-                <label for="reduceNoise">Reduce background noise</label>
-            </div>
-            <div class="checkbox-group">
-                <input type="checkbox" id="removeClicks" checked>
-                <label for="removeClicks">Remove clicks and pops</label>
-            </div>
-            <div class="checkbox-group">
-                <input type="checkbox" id="normalize" checked>
-                <label for="normalize">Normalize volume</label>
-            </div>
-            <button onclick="startCleaning()">🧹 Start Cleaning</button>
             
-            <div class="progress" id="cleaningProgress">
-                <div class="progress-bar">
-                    <div class="progress-fill" style="width: 100%"></div>
+            <div class="help-section">
+                <h3>💡 Tips for Best Results</h3>
+                <ul>
+                    <li>Use high-quality recordings with minimal background noise</li>
+                    <li>Works best with 30 seconds to 10 minutes of audio</li>
+                    <li>If unsure about speaker count, start with 2</li>
+                    <li>Keep files under 100MB for faster processing</li>
+                </ul>
+            </div>
+        </div>
+        
+        <!-- Progress Section -->
+        <div class="progress-section" id="progressSection">
+            <div class="stage-indicator">
+                <div class="stage-icon" id="stageIcon">⚙️</div>
+                <div>
+                    <div class="stage-text" id="stageText">Processing...</div>
                 </div>
-                <div class="status" id="cleaningStatus">Cleaning audio...</div>
             </div>
             
-            <div class="file-list" id="cleanedFiles" style="display: none;"></div>
+            <div class="progress-bar-container">
+                <div class="progress-bar" id="progressBar"></div>
+            </div>
+            <div class="progress-percent" id="progressPercent">0%</div>
         </div>
         
-        <!-- Section 6: Feedback -->
-        <div class="section" id="section-feedback">
-            <h2>Step 6: How did we do?</h2>
-            <p>Rate your experience:</p>
-            <div class="rating" id="rating">
-                <span class="star" data-rating="1">★</span>
-                <span class="star" data-rating="2">★</span>
-                <span class="star" data-rating="3">★</span>
-                <span class="star" data-rating="4">★</span>
-                <span class="star" data-rating="5">★</span>
+        <!-- Results Section -->
+        <div class="results-section" id="resultsSection">
+            <div class="success-message">
+                <div class="success-icon">✅</div>
+                <div class="success-text">Separation Complete!</div>
             </div>
-            <textarea id="feedbackText" placeholder="Tell us about your experience, any issues, or suggestions..."></textarea>
-            <button onclick="submitFeedback()">Submit Feedback</button>
-            <div id="ollamaFeedbackResponse" style="display: none;"></div>
+            
+            <div id="speakerCards"></div>
+            
+            <button class="btn btn-primary" style="width: 100%; margin-bottom: 12px;" onclick="downloadAll()">
+                📥 Download All Speakers
+            </button>
+            
+            <button class="btn btn-secondary" style="width: 100%;" onclick="resetApp()">
+                🔄 Process Another File
+            </button>
+        </div>
+        
+        <!-- Error Section -->
+        <div class="error-message" id="errorMessage">
+            <div class="error-icon" id="errorIcon">❌</div>
+            <div class="error-title" id="errorTitle">Error</div>
+            <div class="error-text" id="errorText"></div>
+            <div class="error-actions">
+                <button class="btn btn-primary" onclick="retryUpload()">Try Again</button>
+                <button class="btn btn-secondary" onclick="resetApp()">Start Over</button>
+            </div>
         </div>
     </div>
-
+    
     <script>
-        const API_URL = 'http://localhost:8000';
-        let currentJobId = null;
-        let currentStep = 1;
-        let selectedRating = 0;
-        let debugMode = true;  // Enable debug logging
+        const API_BASE = window.location.origin || 'http://localhost:8900';
+        // API key is fetched dynamically when needed (see getAuthHeaders())
         
-        function log(message, data = null) {
-            if (debugMode) {
-                console.log(message, data);
-                const debugDiv = document.getElementById('debugInfo');
-                debugDiv.style.display = 'block';
-                const timestamp = new Date().toLocaleTimeString();
-                debugDiv.innerHTML += `[${timestamp}] ${message}<br>`;
-                if (data) {
-                    debugDiv.innerHTML += `<pre>${JSON.stringify(data, null, 2)}</pre>`;
-                }
-                debugDiv.scrollTop = debugDiv.scrollHeight;
-            }
+        let currentJobId = null;
+        let websocket = null;
+        
+        /**
+         * Get authentication headers for API requests
+         * For demo/development: No auth required for public endpoints
+         * For production: Implement proper authentication flow
+         */
+        function getAuthHeaders() {
+            const headers = {
+                'Content-Type': 'application/json'
+            };
+            // In production, fetch token from secure source:
+            // const token = sessionStorage.getItem('auth_token');
+            // if (token) headers['Authorization'] = `Bearer ${token}`;
+            return headers;
         }
         
-        // Upload handlers
+        // Upload area drag & drop
         const uploadArea = document.getElementById('uploadArea');
         const fileInput = document.getElementById('fileInput');
         
@@ -505,423 +517,228 @@
         
         uploadArea.addEventListener('dragover', (e) => {
             e.preventDefault();
-            uploadArea.classList.add('drag-over');
+            uploadArea.classList.add('dragging');
         });
         
         uploadArea.addEventListener('dragleave', () => {
-            uploadArea.classList.remove('drag-over');
+            uploadArea.classList.remove('dragging');
         });
         
         uploadArea.addEventListener('drop', (e) => {
             e.preventDefault();
-            uploadArea.classList.remove('drag-over');
-            if (e.dataTransfer.files.length > 0) {
-                handleFile(e.dataTransfer.files[0]);
-            }
+            uploadArea.classList.remove('dragging');
+            
+            const file = e.dataTransfer.files[0];
+            if (file) handleFileSelect(file);
         });
         
         fileInput.addEventListener('change', (e) => {
-            if (e.target.files.length > 0) {
-                handleFile(e.target.files[0]);
-            }
+            const file = e.target.files[0];
+            if (file) handleFileSelect(file);
         });
         
-        async function handleFile(file) {
-            log('Uploading file', {name: file.name, size: file.size});
+        async function handleFileSelect(file) {
+            // Validate file
+            if (!file.type.startsWith('audio/')) {
+                showError('Invalid File', 'Please upload an audio file (MP3, WAV, M4A)');
+                return;
+            }
             
-            uploadArea.innerHTML = `
-                <h2>⏳ Uploading ${file.name}</h2>
-                <p>Please wait...</p>
-            `;
+            if (file.size > 100 * 1024 * 1024) {
+                showError('File Too Large', 'Maximum file size is 100MB. Please compress your audio or split it into smaller files.');
+                return;
+            }
             
+            // Show progress
+            document.getElementById('uploadSection').style.display = 'none';
+            document.getElementById('progressSection').classList.add('active');
+            document.getElementById('errorMessage').classList.remove('active');
+            
+            // Upload file
+            await uploadFile(file);
+        }
+        
+        async function uploadFile(file) {
             const formData = new FormData();
             formData.append('file', file);
             
             try {
-                const response = await fetch(`${API_URL}/api/v1/upload`, {
+                const response = await fetch(`${API_BASE}/api/v1/upload`, {
                     method: 'POST',
+                    // Don't set Content-Type for FormData - browser sets it with boundary
                     body: formData
                 });
                 
-                if (!response.ok) throw new Error('Upload failed');
+                const data = await response.json();
                 
-                const job = await response.json();
-                currentJobId = job.job_id;
+                if (!response.ok) {
+                    throw new Error(data.error?.message || 'Upload failed');
+                }
                 
-                log('Upload successful', job);
+                currentJobId = data.job_id;
                 
-                // Move to diagnostic step
-                await getDiagnostic();
+                // Connect WebSocket for progress
+                connectWebSocket(currentJobId);
+                
+                // Start separation
+                await startSeparation(currentJobId);
                 
             } catch (error) {
-                log('Upload error', error);
-                uploadArea.innerHTML = `
-                    <div class="error">Upload failed: ${error.message}</div>
-                    <button onclick="location.reload()">Try Again</button>
-                `;
+                showError('Upload Failed', error.message);
             }
         }
         
-        async function getDiagnostic() {
-            goToStep(2);
-            document.getElementById('diagnosticReport').innerHTML = '<p>⏳ Analyzing audio...</p>';
+        function connectWebSocket(jobId) {
+            const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+            websocket = new WebSocket(`${protocol}//${window.location.host}/ws/progress/${jobId}`);
             
-            try {
-                const response = await fetch(`${API_URL}/api/v1/jobs/${currentJobId}/diagnose`);
-                const job = await response.json();
-                
-                log('Diagnostic received', job);
-                
-                const report = job.diagnostic_report;
-                
-                // Set defaults
-                document.getElementById('numSpeakers').value = report.estimated_speakers;
-                
-                // Display report
-                let html = `
-                    <div class="diagnostic-report">
-                        <h3>Audio Analysis</h3>
-                        <div class="metric">
-                            <span class="metric-label">Duration</span>
-                            <span class="metric-value">${report.duration.toFixed(1)}s</span>
-                        </div>
-                        <div class="metric">
-                            <span class="metric-label">Speaking Time</span>
-                            <span class="metric-value">${report.speaking_time.toFixed(1)}s</span>
-                        </div>
-                        <div class="metric">
-                            <span class="metric-label">Estimated Speakers</span>
-                            <span class="metric-value">${report.estimated_speakers}</span>
-                        </div>
-                        <div class="metric">
-                            <span class="metric-label">Mean Pitch</span>
-                            <span class="metric-value">${report.mean_pitch.toFixed(0)} Hz</span>
-                        </div>
-                        <div class="metric">
-                            <span class="metric-label">Audio Quality</span>
-                            <span class="metric-value quality-${report.audio_quality}">${report.audio_quality.toUpperCase()}</span>
-                        </div>
-                    </div>
-                `;
-                
-                if (report.issues && report.issues.length > 0) {
-                    html += `
-                        <div class="issues">
-                            <h4>⚠️ Issues Detected:</h4>
-                            <ul>
-                                ${report.issues.map(issue => `<li>${issue}</li>`).join('')}
-                            </ul>
-                        </div>
-                    `;
+            websocket.onmessage = (event) => {
+                const data = JSON.parse(event.data);
+                if (data.type !== 'ping') {
+                    updateProgress(data);
                 }
-                
-                if (report.recommendations && report.recommendations.length > 0) {
-                    html += `
-                        <div class="recommendations">
-                            <h4>💡 Recommendations:</h4>
-                            <ul>
-                                ${report.recommendations.map(rec => `<li>${rec}</li>`).join('')}
-                            </ul>
-                        </div>
-                    `;
-                }
-                
-                if (report.ollama_analysis) {
-                    html += `
-                        <div class="ollama-analysis">
-                            <h4>🤖 AI Analysis:</h4>
-                            <p>${report.ollama_analysis}</p>
-                        </div>
-                    `;
-                }
-                
-                document.getElementById('diagnosticReport').innerHTML = html;
-                
-            } catch (error) {
-                log('Diagnostic error', error);
-                document.getElementById('diagnosticReport').innerHTML = `
-                    <div class="error">Failed to get diagnostic: ${error.message}</div>
-                `;
-            }
+            };
+            
+            websocket.onerror = () => {
+                console.log('WebSocket error, falling back to polling');
+                startPolling(jobId);
+            };
         }
         
-        async function proceedWithSeparation() {
+        async function startSeparation(jobId) {
             const numSpeakers = parseInt(document.getElementById('numSpeakers').value);
             const method = document.getElementById('method').value;
             
-            log('Starting separation', {numSpeakers, method});
+            const response = await fetch(`${API_BASE}/api/v1/jobs/${jobId}/proceed`, {
+                method: 'POST',
+                headers: getAuthHeaders(),
+                body: JSON.stringify({
+                    action: 'proceed',
+                    num_speakers: numSpeakers,
+                    method: method
+                })
+            });
             
+            if (!response.ok) {
+                const data = await response.json();
+                throw new Error(data.error?.message || 'Separation failed');
+            }
+        }
+        
+        function updateProgress(data) {
+            const { stage, percent, message } = data;
+            
+            document.getElementById('progressBar').style.width = `${percent}%`;
+            document.getElementById('progressPercent').textContent = `${percent}%`;
+            document.getElementById('stageText').textContent = message;
+            
+            const icons = {
+                'upload': '📤',
+                'loading': '📂',
+                'analyzing': '🔍',
+                'separating': '🎤',
+                'finalizing': '✨',
+                'complete': '✅',
+                'error': '❌'
+            };
+            document.getElementById('stageIcon').textContent = icons[stage] || '⚙️';
+            
+            if (stage === 'complete') {
+                fetchResults();
+            } else if (stage === 'error') {
+                showError('Processing Failed', message);
+            }
+        }
+        
+        async function fetchResults() {
             try {
-                const response = await fetch(`${API_URL}/api/v1/jobs/${currentJobId}/proceed`, {
-                    method: 'POST',
-                    headers: {'Content-Type': 'application/json'},
-                    body: JSON.stringify({
-                        action: 'proceed',
-                        num_speakers: numSpeakers,
-                        method: method
-                    })
-                });
-                
-                if (!response.ok) throw new Error('Failed to start separation');
+                const response = await fetch(`${API_BASE}/api/v1/jobs/${currentJobId}`);
                 
                 const job = await response.json();
-                log('Separation started', job);
-                
-                goToStep(3);
-                pollSeparationStatus();
+                displayResults(job);
                 
             } catch (error) {
-                log('Separation start error', error);
-                alert(`Error: ${error.message}`);
+                showError('Failed to Load Results', error.message);
             }
         }
         
-        async function pollSeparationStatus() {
-            const interval = setInterval(async () => {
-                try {
-                    const response = await fetch(`${API_URL}/api/v1/jobs/${currentJobId}`);
-                    const job = await response.json();
-                    
-                    log('Poll status', {status: job.status});
-                    
-                    document.getElementById('separationStatus').textContent = 
-                        `Status: ${job.status}...`;
-                    
-                    if (job.status === 'separated') {
-                        clearInterval(interval);
-                        log('Separation complete', job);
-                        displaySeparatedFiles(job);
-                    } else if (job.status === 'failed') {
-                        clearInterval(interval);
-                        log('Separation failed', job);
-                        document.getElementById('separationStatus').innerHTML = 
-                            `<div class="error">Separation failed: ${job.error || 'Unknown error'}</div>`;
-                    }
-                } catch (error) {
-                    log('Poll error', error);
-                    clearInterval(interval);
-                    document.getElementById('separationStatus').innerHTML = 
-                        `<div class="error">Error checking status: ${error.message}</div>`;
-                }
-            }, 2000);
-        }
-        
-        function displaySeparatedFiles(job) {
-            log('Displaying separated files', job);
+        function displayResults(job) {
+            document.getElementById('progressSection').classList.remove('active');
+            document.getElementById('resultsSection').classList.add('active');
             
-            goToStep(4);
+            const speakerCards = document.getElementById('speakerCards');
+            speakerCards.innerHTML = '';
             
-            // Check if separated_files exists and has data
-            if (!job.separated_files || Object.keys(job.separated_files).length === 0) {
-                document.getElementById('separatedFiles').innerHTML = `
-                    <div class="error">
-                        <p>No separated files found in response.</p>
-                        <p>Debug info: ${JSON.stringify(job, null, 2)}</p>
-                        <button onclick="location.reload()">Start Over</button>
-                    </div>
-                `;
-                return;
-            }
-            
-            let html = '';
-            for (const [speaker, url] of Object.entries(job.separated_files)) {
-                html += `
-                    <div class="file-item">
-                        <span>🎤 ${speaker}.wav</span>
-                        <a href="${API_URL}${url}" class="download-btn" download>⬇️ Download</a>
-                    </div>
-                `;
-            }
-            
-            document.getElementById('separatedFiles').innerHTML = html;
-        }
-        
-        function showCleaningSection() {
-            goToStep(5);
-        }
-        
-        async function startCleaning() {
-            document.getElementById('cleaningProgress').classList.add('active');
-            
-            const config = {
-                remove_silence: document.getElementById('removeSilence').checked,
-                reduce_noise: document.getElementById('reduceNoise').checked,
-                remove_clicks: document.getElementById('removeClicks').checked,
-                normalize: document.getElementById('normalize').checked
-            };
-            
-            log('Starting cleaning', config);
-            
-            try {
-                const response = await fetch(`${API_URL}/api/v1/jobs/${currentJobId}/clean`, {
-                    method: 'POST',
-                    headers: {'Content-Type': 'application/json'},
-                    body: JSON.stringify(config)
-                });
-                
-                if (!response.ok) throw new Error('Cleaning failed');
-                
-                log('Cleaning started');
-                pollCleaningStatus();
-                
-            } catch (error) {
-                log('Cleaning error', error);
-                document.getElementById('cleaningStatus').innerHTML = 
-                    `<div class="error">Error: ${error.message}</div>`;
-            }
-        }
-        
-        async function pollCleaningStatus() {
-            const interval = setInterval(async () => {
-                try {
-                    const response = await fetch(`${API_URL}/api/v1/jobs/${currentJobId}`);
-                    const job = await response.json();
-                    
-                    log('Cleaning status', {status: job.status});
-                    
-                    document.getElementById('cleaningStatus').textContent = 
-                        `Status: ${job.status}...`;
-                    
-                    if (job.status === 'completed') {
-                        clearInterval(interval);
-                        log('Cleaning complete', job);
-                        displayCleanedFiles(job);
-                    } else if (job.status === 'failed') {
-                        clearInterval(interval);
-                        log('Cleaning failed', job);
-                        document.getElementById('cleaningStatus').innerHTML = 
-                            `<div class="error">Cleaning failed: ${job.error || 'Unknown error'}</div>`;
-                    }
-                } catch (error) {
-                    log('Cleaning poll error', error);
-                    clearInterval(interval);
-                }
-            }, 2000);
-        }
-        
-        function displayCleanedFiles(job) {
-            document.getElementById('cleaningProgress').classList.remove('active');
-            
-            let html = '<h3>✨ Cleaned Files Ready!</h3>';
-            
-            if (job.cleaned_files && Object.keys(job.cleaned_files).length > 0) {
-                for (const [speaker, url] of Object.entries(job.cleaned_files)) {
-                    html += `
-                        <div class="file-item">
-                            <span>✨ ${speaker}.wav</span>
-                            <a href="${API_URL}${url}" class="download-btn" download>⬇️ Download</a>
+            Object.entries(job.separated_files || {}).forEach(([speaker, url], index) => {
+                const card = document.createElement('div');
+                card.className = 'speaker-card';
+                card.innerHTML = `
+                    <div class="speaker-info">
+                        <div class="speaker-icon">👤</div>
+                        <div>
+                            <div class="speaker-title">Speaker ${index + 1}</div>
+                            <div class="speaker-stats">Ready to download</div>
                         </div>
-                    `;
-                }
-            } else {
-                html += '<p class="error">No cleaned files available</p>';
+                    </div>
+                    <a href="${API_BASE}${url}" class="download-btn" download>
+                        📥 Download
+                    </a>
+                `;
+                speakerCards.appendChild(card);
+            });
+        }
+        
+        function showError(title, message) {
+            document.getElementById('progressSection').classList.remove('active');
+            document.getElementById('errorMessage').classList.add('active');
+            document.getElementById('errorTitle').textContent = title;
+            document.getElementById('errorText').textContent = message;
+        }
+        
+        function retryUpload() {
+            document.getElementById('errorMessage').classList.remove('active');
+            document.getElementById('uploadSection').style.display = 'block';
+            fileInput.click();
+        }
+        
+        function resetApp() {
+            document.getElementById('uploadSection').style.display = 'block';
+            document.getElementById('progressSection').classList.remove('active');
+            document.getElementById('resultsSection').classList.remove('active');
+            document.getElementById('errorMessage').classList.remove('active');
+            
+            if (websocket) {
+                websocket.close();
+                websocket = null;
             }
             
-            html += '<button onclick="goToStep(6)">Continue to Feedback →</button>';
-            
-            document.getElementById('cleanedFiles').innerHTML = html;
-            document.getElementById('cleanedFiles').style.display = 'block';
+            currentJobId = null;
+            fileInput.value = '';
         }
         
-        function skipToFeedback() {
-            goToStep(6);
+        async function downloadAll() {
+            alert('Download all speakers as ZIP - Coming soon!');
         }
         
-        // Rating stars
-        document.querySelectorAll('.star').forEach(star => {
-            star.addEventListener('click', function() {
-                selectedRating = parseInt(this.dataset.rating);
-                document.querySelectorAll('.star').forEach((s, i) => {
-                    if (i < selectedRating) {
-                        s.classList.add('active');
-                    } else {
-                        s.classList.remove('active');
-                    }
-                });
-            });
+        // Keyboard shortcuts
+        document.addEventListener('keydown', (e) => {
+            if ((e.ctrlKey || e.metaKey) && e.key === 'u') {
+                e.preventDefault();
+                fileInput.click();
+            }
         });
-        
-        async function submitFeedback() {
-            const feedback = document.getElementById('feedbackText').value;
-            
-            if (!feedback && selectedRating === 0) {
-                alert('Please provide a rating or feedback');
-                return;
-            }
-            
-            log('Submitting feedback', {feedback, rating: selectedRating});
-            
-            try {
-                const response = await fetch(`${API_URL}/api/v1/jobs/${currentJobId}/feedback`, {
-                    method: 'POST',
-                    headers: {'Content-Type': 'application/json'},
-                    body: JSON.stringify({
-                        feedback: feedback,
-                        rating: selectedRating
-                    })
-                });
-                
-                const job = await response.json();
-                log('Feedback submitted', job);
-                
-                if (job.ollama_feedback_response) {
-                    const responseDiv = document.getElementById('ollamaFeedbackResponse');
-                    responseDiv.innerHTML = `
-                        <div class="ollama-analysis" style="margin-top: 1rem;">
-                            <h4>🤖 AI Response to Your Feedback:</h4>
-                            <p>${job.ollama_feedback_response}</p>
-                        </div>
-                        <button onclick="location.reload()">Process Another File</button>
-                    `;
-                    responseDiv.style.display = 'block';
+
+        function startPolling(jobId) {
+            const interval = setInterval(async () => {
+                const response = await fetch(`${API_BASE}/api/v1/jobs/${jobId}`);
+                const data = await response.json();
+                updateProgress(data);
+                if (data.stage === 'complete' || data.stage === 'error') {
+                    clearInterval(interval);
                 }
-                
-            } catch (error) {
-                log('Feedback error', error);
-                alert(`Error submitting feedback: ${error.message}`);
-            }
+            }, 2000);
         }
-        
-        function cancelJob() {
-            if (confirm('Are you sure you want to cancel?')) {
-                location.reload();
-            }
-        }
-        
-        function goToStep(step) {
-            currentStep = step;
-            log(`Moving to step ${step}`);
-            
-            // Update step indicators
-            for (let i = 1; i <= 6; i++) {
-                const stepEl = document.getElementById(`step-${i}`);
-                if (i < step) {
-                    stepEl.classList.add('completed');
-                    stepEl.classList.remove('active');
-                } else if (i === step) {
-                    stepEl.classList.add('active');
-                    stepEl.classList.remove('completed');
-                } else {
-                    stepEl.classList.remove('active', 'completed');
-                }
-            }
-            
-            // Show appropriate section
-            document.querySelectorAll('.section').forEach(section => {
-                section.classList.remove('active');
-            });
-            
-            const sectionMap = {
-                1: 'upload',
-                2: 'diagnostic',
-                3: 'separating',
-                4: 'download',
-                5: 'cleaning',
-                6: 'feedback'
-            };
-            
-            document.getElementById(`section-${sectionMap[step]}`).classList.add('active');
-        }
+
     </script>
 </body>
 </html>

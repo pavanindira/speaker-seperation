@@ -10,6 +10,7 @@ from typing import Optional, Callable, Any, Type, List, Dict
 from datetime import datetime, timedelta
 from enum import Enum
 from logger_wrapper import logger
+import os
 
 # ============================================================================
 # Error Types
@@ -363,6 +364,156 @@ class SafeExecutor:
             )
             raise TimeoutError(operation_name, int(timeout_seconds))
 
+# =============================================================================
+# USER-FRIENDLY ERROR FORMATTER
+# Add this entire section to your error_handler.py
+# =============================================================================
+
+class UserFriendlyErrorFormatter:
+    """Convert technical errors to user-friendly messages"""
+    
+    ERROR_TEMPLATES = {
+        'ValidationError': {
+            'icon': '⚠️',
+            'title': 'Invalid Input',
+            'severity': 'warning',
+            'helpful_tips': [
+                'Check that your file is a valid audio format',
+                'Ensure file size is under 100MB',
+                'Make sure the file isn\'t corrupted'
+            ]
+        },
+        'FileSizeError': {
+            'icon': '📁',
+            'title': 'File Too Large',
+            'severity': 'error',
+            'helpful_tips': [
+                'Maximum file size is 100MB',
+                'Try compressing your audio (reduce quality to 128kbps)',
+                'Split longer recordings into smaller chunks'
+            ]
+        },
+        'ProcessingError': {
+            'icon': '🔧',
+            'title': 'Processing Failed',
+            'severity': 'error',
+            'helpful_tips': [
+                'Ensure your audio has clear speech',
+                'Try with a different audio file',
+                'Check if the file plays correctly on your device'
+            ]
+        },
+        'TimeoutError': {
+            'icon': '⏱️',
+            'title': 'Taking Too Long',
+            'severity': 'warning',
+            'helpful_tips': [
+                'Large files can take 3-5 minutes to process',
+                'Try with a shorter audio clip (under 5 minutes)',
+                'Server might be busy - try again in a few minutes'
+            ]
+        },
+        'OllamaError': {
+            'icon': '🤖',
+            'title': 'AI Analysis Unavailable',
+            'severity': 'info',
+            'message_override': 'AI recommendations are offline, but speaker separation will work normally.',
+            'helpful_tips': [
+                'Your audio will still be separated correctly',
+                'You won\'t get AI-powered insights right now'
+            ]
+        },
+        'AuthenticationError': {
+            'icon': '🔐',
+            'title': 'Authentication Failed',
+            'severity': 'error',
+            'helpful_tips': [
+                'Check that your API key is correct',
+                'Your session may have expired - try refreshing'
+            ]
+        },
+        'NotFoundError': {
+            'icon': '🔍',
+            'title': 'Not Found',
+            'severity': 'error',
+            'helpful_tips': [
+                'The file you\'re looking for doesn\'t exist',
+                'It may have been deleted or expired',
+                'Try uploading your file again'
+            ]
+        }
+    }
+    
+    @classmethod
+    def format_error(cls, error, request_id: Optional[str] = None) -> dict:
+        """
+        Format any APIError for user-friendly display
+        
+        Args:
+            error: APIError instance
+            request_id: Optional request ID for tracking
+            
+        Returns:
+            User-friendly error response dict
+        """
+        error_type = type(error).__name__
+        template = cls.ERROR_TEMPLATES.get(error_type, {
+            'icon': '❌',
+            'title': 'Something Went Wrong',
+            'severity': 'error',
+            'helpful_tips': [
+                'Try refreshing the page',
+                'Upload your file again',
+                'Contact support if this persists'
+            ]
+        })
+        
+        # Generate unique error ID
+        timestamp = datetime.utcnow().strftime('%Y%m%d%H%M%S')
+        error_hash = abs(hash(str(error.message) + timestamp)) % 10000
+        error_id = f"ERR_{error.status_code}_{error_hash:04d}"
+        
+        # Determine if user can retry
+        can_retry = error.status_code in [408, 429, 500, 502, 503, 504]
+        is_temporary = error.status_code in [408, 429, 503, 504]
+        
+        # Get user-friendly message
+        user_message = (
+            template.get('message_override') or 
+            getattr(error, 'user_message', None) or 
+            error.message
+        )
+        
+        # Build response
+        response = {
+            'success': False,
+            'error': {
+                'icon': template['icon'],
+                'title': template['title'],
+                'message': user_message,
+                'severity': template['severity'],
+                'error_id': error_id,
+                'can_retry': can_retry,
+                'is_temporary': is_temporary,
+                'helpful_tips': template.get('helpful_tips', []),
+                'timestamp': datetime.utcnow().isoformat(),
+                'request_id': request_id
+            },
+            'status_code': error.status_code
+        }
+        
+        # Add validation errors if present
+        if hasattr(error, 'details') and error.details:
+            response['error']['validation_errors'] = error.details
+        
+        # Show technical details only in debug mode
+        if os.getenv('DEBUG') == 'true':
+            response['error']['debug'] = {
+                'technical_message': str(error.message),
+                'error_type': error_type
+            }
+        
+        return response
 
 # ============================================================================
 # Usage Examples

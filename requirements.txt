@@ -36,6 +36,7 @@ python-multipart>=0.0.6  # File upload support
 aiofiles>=23.2.1         # Async file operations (Python 3.11+)
 requests>=2.31.0         # HTTP client for Ollama
 jinja2>=3.1.2            # Jinja templates for frontend UI
+slowapi>=0.1.9           # Rate limiting for API (Python 3.11+)
 
 # ============================================================================
 # Audio Format Support

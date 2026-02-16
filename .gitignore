@@ -36,3 +36,7 @@ conversation_output/
 
 # --- Logs ---
 *.log
+logs/
+
+# --- Backups ---
+backup/

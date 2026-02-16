@@ -199,6 +199,82 @@ app = FastAPI(
     version="2.0.0"
 )
 
+from fastapi import Request
+from fastapi.responses import JSONResponse
+from error_handler import APIError, UserFriendlyErrorFormatter
+import uuid
+
+# =============================================================================
+# EXCEPTION HANDLERS - Add this section after app = FastAPI()
+# =============================================================================
+
+@app.exception_handler(APIError)
+async def api_error_handler(request: Request, exc: APIError):
+    """
+    Handle all APIError exceptions with user-friendly responses
+    This catches: ValidationError, FileSizeError, ProcessingError, etc.
+    """
+    
+    # Generate request ID if not exists
+    request_id = str(getattr(request.state, 'request_id', uuid.uuid4()))
+    
+    # Format error for users
+    formatted_error = UserFriendlyErrorFormatter.format_error(exc, request_id)
+    
+    # Log for developers/monitoring
+    logger.error(
+        f"API Error: {exc.message}",
+        extra={
+            'error_id': formatted_error['error']['error_id'],
+            'error_type': type(exc).__name__,
+            'status_code': exc.status_code,
+            'path': str(request.url.path),
+            'method': request.method,
+            'user_message': formatted_error['error']['message']
+        },
+        component='error_handler'
+    )
+    
+    return JSONResponse(
+        status_code=exc.status_code,
+        content=formatted_error
+    )
+
+
+@app.exception_handler(Exception)
+async def generic_error_handler(request: Request, exc: Exception):
+    """
+    Catch-all for unexpected errors that aren't APIErrors
+    """
+    
+    # Convert to APIError
+    api_error = APIError(
+        message=str(exc),
+        status_code=500,
+        user_message="An unexpected error occurred. Our team has been notified."
+    )
+    
+    request_id = str(uuid.uuid4())
+    formatted_error = UserFriendlyErrorFormatter.format_error(api_error, request_id)
+    
+    # Log as critical since this is unexpected
+    logger.critical(
+        f"Unexpected error: {exc}",
+        exception=exc,
+        extra={
+            'error_id': formatted_error['error']['error_id'],
+            'path': str(request.url.path),
+            'method': request.method,
+            'request_id': request_id
+        },
+        component='error_handler'
+    )
+    
+    return JSONResponse(
+        status_code=500,
+        content=formatted_error
+    )
+
 # Jinja templates and static files
 _BASE_DIR = Path(__file__).resolve().parent
 _TEMPLATES_DIR = _BASE_DIR / "templates"
@@ -330,7 +406,11 @@ def validate_file_size(file_size: int) -> bool:
     if file_size > MAX_FILE_SIZE:
         file_size_mb = file_size / 1024 / 1024
         max_size_mb = MAX_FILE_SIZE / 1024 / 1024
-        raise FileSizeError(file_size_mb, int(max_size_mb))
+        raise FileSizeError(
+            file_size_mb, 
+            max_size_mb,
+            user_message=f"Your file is {file_size_mb:.1f}MB. Maximum size is {max_size_mb}MB. Try compressing it or splitting into smaller files."
+        )
     return True
 
 # ============================================================================
@@ -352,9 +432,14 @@ async def upload_audio(
         
         if file_ext not in allowed_extensions:
             raise ValidationError(
-                f"Unsupported file type: {file_ext}",
+                message=f"File extension validation failed: {file_ext}",
                 field="filename",
-                user_message=f"File type {file_ext} not supported. Use: {', '.join(allowed_extensions)}"
+                user_message=f"We can't process {file_ext} files. Please upload an audio file (MP3, WAV, M4A, FLAC).",
+                details={
+                    'uploaded_type': file_ext,
+                    'supported_types': list(allowed_extensions),
+                    'filename': file.filename
+                }
             )
         
         # Read and validate file size
