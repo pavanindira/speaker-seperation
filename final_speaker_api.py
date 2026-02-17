@@ -199,15 +199,6 @@ app = FastAPI(
     version="2.0.0"
 )
 
-# CORS Configuration - MUST be added first for proper middleware ordering
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=os.getenv("CORS_ORIGINS", "*").split(","),
-    allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
-)
-
 from fastapi import Request, WebSocket, WebSocketDisconnect
 from fastapi.responses import JSONResponse
 from error_handler import APIError, UserFriendlyErrorFormatter
@@ -346,6 +337,15 @@ try:
 except ImportError as e:
     print(f"⚠️  Monitoring modules not available: {e}")
     MONITORING_AVAILABLE = False
+
+# CORS Configuration - MUST be added LAST so it's executed FIRST (LIFO order)
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=os.getenv("CORS_ORIGINS", "*").split(","),
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
 
 # Metrics endpoint (CRITICAL FIX #3: Safe fallback for prometheus_client)
 @app.get("/metrics")
@@ -557,6 +557,21 @@ async def upload_audio(
                     'filename': safe_filename
                 }
             )
+        
+        # Check file size from Content-Length header BEFORE reading the file
+        # This prevents memory issues with large files
+        content_length = request.headers.get('content-length')
+        if content_length:
+            estimated_size = int(content_length)
+            # Account for multipart encoding overhead (~10%)
+            if estimated_size > MAX_FILE_SIZE * 1.1:
+                file_size_mb = estimated_size / 1024 / 1024
+                max_size_mb = MAX_FILE_SIZE / 1024 / 1024
+                raise FileSizeError(
+                    file_size_mb,
+                    max_size_mb,
+                    user_message=f"Your file is approximately {file_size_mb:.1f}MB. Maximum size is {max_size_mb:.0f}MB. Try compressing it or splitting into smaller files."
+                )
         
         # Read and validate file size
         file_content = await file.read()
@@ -963,10 +978,11 @@ async def root():
 
 @app.get("/health")
 async def health():
-    """Health check"""
+    """Health check - fast response without blocking"""
     ollama_status = "disconnected"
     try:
-        response = requests.get(f"{config.OLLAMA_URL}/api/tags", timeout=2)
+        # Use a very short timeout for health checks
+        response = requests.get(f"{config.OLLAMA_URL}/api/tags", timeout=1)
         ollama_status = "connected" if response.status_code == 200 else "error"
     except Exception:
         pass
