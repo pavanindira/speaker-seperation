@@ -13,14 +13,17 @@
   <!-- Upload Section -->
   <section class="card">
     <h2>Upload Audio</h2>
-    <div class="upload-area" id="uploadArea">
-      <div class="upload-icon"> folder</div>
-      <div class="upload-text">Drop your audio file here</div>
-      <div class="upload-hint">or click to browse - MP3, WAV, M4A, FLAC, OGG - Max 100MB</div>
-      <form id="uploadForm" action="/ui/upload" method="post" enctype="multipart/form-data" style="display: none;">
-        <input type="file" id="fileInput" name="file" accept=".mp3,.wav,.m4a,.flac,.ogg,audio/*" required />
-      </form>
-    </div>
+    <form id="uploadForm" action="/ui/upload" method="post" enctype="multipart/form-data" class="form">
+      <label class="label" for="file">Audio file</label>
+      <input class="input" id="file" name="file" type="file" accept=".mp3,.wav,.flac,.ogg,.m4a,audio/*" required />
+
+      <div class="actions">
+        <button class="button" type="submit">Upload & continue</button>
+        <a class="button secondary" href="/docs" target="_blank" rel="noopener">Open API docs</a>
+      </div>
+
+      <p class="hint">Supported: mp3, wav, flac, ogg, m4a. Max size is enforced server-side.</p>
+    </form>
   </section>
 
   <!-- Settings -->
@@ -83,47 +86,17 @@
 
 {% block scripts %}
 <script>
-  // Upload area drag & drop
-  const uploadArea = document.getElementById('uploadArea');
-  const fileInput = document.getElementById('fileInput');
-  const uploadForm = document.getElementById('uploadForm');
-
-  uploadArea.addEventListener('click', () => {
-    fileInput.click();
-  });
-
-  uploadArea.addEventListener('dragover', (e) => {
-    e.preventDefault();
-    uploadArea.classList.add('dragging');
-  });
-
-  uploadArea.addEventListener('dragleave', () => {
-    uploadArea.classList.remove('dragging');
-  });
-
-  uploadArea.addEventListener('drop', (e) => {
-    e.preventDefault();
-    uploadArea.classList.remove('dragging');
+  (function() {
+    var uploadForm = document.getElementById('uploadForm');
     
-    const files = e.dataTransfer.files;
-    if (files.length > 0) {
-      fileInput.files = files;
-      submitForm();
-    }
-  });
-
-  fileInput.addEventListener('change', () => {
-    if (fileInput.files.length > 0) {
-      submitForm();
-    }
-  });
-
-  function submitForm() {
-    // Store settings in sessionStorage for the job page
-    sessionStorage.setItem('numSpeakers', document.getElementById('numSpeakers').value);
-    sessionStorage.setItem('method', document.getElementById('method').value);
-    
-    uploadForm.submit();
-  }
+    // Form submit - store settings
+    uploadForm.addEventListener('submit', function(e) {
+      // Store settings in sessionStorage for the job page
+      var numSpeakers = document.getElementById('numSpeakers').value;
+      var method = document.getElementById('method').value;
+      sessionStorage.setItem('numSpeakers', numSpeakers);
+      sessionStorage.setItem('method', method);
+    });
+  })();
 </script>
 {% endblock %}
