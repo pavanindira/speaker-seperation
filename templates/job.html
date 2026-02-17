@@ -5,15 +5,15 @@
 {% block content %}
   <!-- Progress Section -->
   <section class="hero narrow centerLayout">
-    <h1>🎤 Processing</h1>
+    <h1>Processing</h1>
     <p class="subtle">
       <span class="mono">{{ job_id }}</span>
     </p>
     
     <div class="stage-indicator">
-      <div class="stage-icon" id="stageIcon" style="font-size: 48px;">⚙️</div>
+      <div class="stage-icon" id="stageIcon"> </div>
       <div>
-        <div class="stage-text" id="stageText" style="font-size: 18px; font-weight: 500;">Loading...</div>
+        <div class="stage-text" id="stageText">Loading...</div>
       </div>
     </div>
     
@@ -77,19 +77,19 @@
       <div class="summaryGrid">
         <div class="summaryItem">
           <div class="label">Estimated speakers</div>
-          <div class="summaryValue" id="diagSpeakers">—</div>
+          <div class="summaryValue" id="diagSpeakers">-</div>
         </div>
         <div class="summaryItem">
           <div class="label">Quality</div>
-          <div class="summaryValue" id="diagQuality">—</div>
+          <div class="summaryValue" id="diagQuality">-</div>
         </div>
         <div class="summaryItem">
           <div class="label">Duration</div>
-          <div class="summaryValue" id="diagDuration">—</div>
+          <div class="summaryValue" id="diagDuration">-</div>
         </div>
         <div class="summaryItem">
           <div class="label">Sample rate</div>
-          <div class="summaryValue" id="diagSr">—</div>
+          <div class="summaryValue" id="diagSr">-</div>
         </div>
       </div>
       <div class="summaryLists">
@@ -107,7 +107,7 @@
     <!-- Step 1: Diagnose -->
     <div id="sectionDiagnose" class="wizardSection hidden">
       <div class="actions">
-        <button class="button primary" id="btnDiagnose">Analyze audio</button>
+        <button class="button" id="btnDiagnose">Analyze audio</button>
       </div>
     </div>
 
@@ -115,7 +115,7 @@
     <div id="sectionSeparate" class="wizardSection hidden">
       <div class="summaryLine" id="separationSummary"></div>
       <div class="actions">
-        <button class="button primary" id="btnProceed">Start separation</button>
+        <button class="button" id="btnProceed">Start separation</button>
       </div>
 
       <details class="details leftLayout">
@@ -150,7 +150,7 @@
     <!-- Step 3: Clean -->
     <div id="sectionClean" class="wizardSection hidden">
       <div class="actions">
-        <button class="button primary" id="btnClean">Clean audio (optional)</button>
+        <button class="button" id="btnClean">Clean audio (optional)</button>
         <button class="button secondary" id="btnSkipClean" type="button">Skip</button>
       </div>
     </div>
@@ -184,7 +184,7 @@
 
   <!-- Results Section -->
   <section class="card narrow">
-    <h2>📥 Results</h2>
+    <h2>Results</h2>
     <div id="downloads" class="downloads subtle">No files yet.</div>
   </section>
 
@@ -193,7 +193,7 @@
     <div class="loaderCard">
       <div class="spinner" aria-hidden="true"></div>
       <div>
-        <div class="loaderTitle" id="loaderTitle">Working…</div>
+        <div class="loaderTitle" id="loaderTitle">Working...</div>
         <div class="loaderSubtitle" id="loaderSubtitle">Please wait.</div>
       </div>
     </div>
@@ -217,5 +217,5 @@
       }
     });
   </script>
-  <script src="/static/ui.js?v=7"></script>
+  <script src="/static/ui.js?v=8"></script>
 {% endblock %}

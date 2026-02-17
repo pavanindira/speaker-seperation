@@ -4,66 +4,65 @@
 
 {% block content %}
   <section class="hero">
-    <h1>🎤 Speaker Separation</h1>
-    <p class="subtitle">Upload audio with multiple speakers and get individual voice tracks</p>
+    <h1>Speaker Separation</h1>
+    <p class="subtle">
+      Upload an audio file with multiple speakers and get individual voice tracks.
+    </p>
   </section>
 
   <!-- Upload Section -->
-  <div class="card">
+  <section class="card">
+    <h2>Upload Audio</h2>
     <div class="upload-area" id="uploadArea">
-      <div class="upload-icon">📁</div>
+      <div class="upload-icon"> folder</div>
       <div class="upload-text">Drop your audio file here</div>
-      <div class="upload-hint">or click to browse • MP3, WAV, M4A, FLAC, OGG • Max 100MB</div>
+      <div class="upload-hint">or click to browse - MP3, WAV, M4A, FLAC, OGG - Max 100MB</div>
       <form id="uploadForm" action="/ui/upload" method="post" enctype="multipart/form-data" style="display: none;">
         <input type="file" id="fileInput" name="file" accept=".mp3,.wav,.m4a,.flac,.ogg,audio/*" required />
       </form>
     </div>
-  </div>
+  </section>
 
   <!-- Settings -->
-  <div class="card">
-    <h2>⚙️ Settings</h2>
-    <div class="form">
-      <div class="row">
-        <div>
-          <label class="label" for="numSpeakers">Number of Speakers</label>
-          <input class="input small" id="numSpeakers" type="number" min="2" max="10" value="2" />
-          <p class="hint">Start with 2 if unsure</p>
-        </div>
-        <div>
-          <label class="label" for="method">Method</label>
-          <select class="input" id="method">
-            <option value="gmm" selected>GMM (Recommended)</option>
-            <option value="kmeans">K-Means (Faster)</option>
-            <option value="spectral">Spectral (Advanced)</option>
-          </select>
-          <p class="hint">If unsure, keep GMM</p>
-        </div>
+  <section class="card">
+    <h2>Settings</h2>
+    <div class="settings">
+      <div class="setting-row">
+        <span>Number of Speakers</span>
+        <input type="number" id="numSpeakers" value="2" min="2" max="10" />
+      </div>
+      <div class="setting-row">
+        <span>Separation Method</span>
+        <select id="method">
+          <option value="gmm" selected>GMM (Recommended)</option>
+          <option value="kmeans">K-Means (Faster)</option>
+          <option value="spectral">Spectral (Advanced)</option>
+        </select>
       </div>
     </div>
-  </div>
+  </section>
 
   <!-- Tips -->
-  <div class="card">
-    <h2>💡 Tips for Best Results</h2>
+  <section class="card">
+    <h2>Tips for Best Results</h2>
     <ul class="list">
       <li>Use high-quality recordings with minimal background noise</li>
       <li>Works best with 30 seconds to 10 minutes of audio</li>
       <li>If unsure about speaker count, start with 2</li>
       <li>Keep files under 100MB for faster processing</li>
     </ul>
-  </div>
+  </section>
 
   <!-- Recent Jobs -->
   {% if recent_jobs and recent_jobs|length > 0 %}
-  <div class="card">
+  <section class="card">
     <h2>Recent Jobs</h2>
     <div class="jobList">
       {% for j in recent_jobs %}
         <a class="jobItem" href="/ui/jobs/{{ j.job_id }}">
           <div class="jobMain">
             <div class="jobTitle">{{ j.filename }}</div>
-            <div class="subtle mono">{{ j.job_id }}</div>
+            <div class="jobSubtle mono">{{ j.job_id }}</div>
           </div>
           <div class="jobMeta">
             <span class="pill {{ j.status }}">{{ j.status }}</span>
@@ -73,7 +72,12 @@
       {% endfor %}
     </div>
     <p class="hint">Jobs are stored in memory and reset when the server restarts.</p>
-  </div>
+  </section>
+  {% else %}
+  <section class="card">
+    <h2>Recent Jobs</h2>
+    <p class="subtle">No jobs yet. Upload an audio file to get started.</p>
+  </section>
   {% endif %}
 {% endblock %}
 
