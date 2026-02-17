@@ -3,6 +3,19 @@
 {% block title %}Upload Audio | Speaker Separation{% endblock %}
 
 {% block content %}
+  <!-- Error Display Container -->
+  <div class="error-container hidden" id="errorContainer">
+    <!-- Error content inserted by JavaScript -->
+  </div>
+
+  <!-- Progress Indicator -->
+  <div class="progress-indicator hidden" id="progressIndicator">
+    <div class="progress-bar">
+      <div class="progress-fill" id="progressFill" style="width: 0%"></div>
+    </div>
+    <div class="progress-text" id="progressText">Uploading...</div>
+  </div>
+
   <section class="hero">
     <h1>Speaker Separation</h1>
     <p class="subtle">

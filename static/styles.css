@@ -652,6 +652,33 @@ h2 { margin: 0 0 12px; font-size: 18px; color: rgba(255,255,255,0.92); }
   font-family: monospace;
 }
 
+/* Progress Indicator */
+.progress-indicator {
+  margin: 20px 0;
+  padding: 16px;
+  border-radius: 14px;
+  background: rgba(124, 92, 255, 0.08);
+  border: 1px solid rgba(124, 92, 255, 0.20);
+}
+.progress-indicator .progress-bar {
+  height: 8px;
+  border-radius: 4px;
+  background: rgba(255, 255, 255, 0.10);
+  overflow: hidden;
+  margin-bottom: 8px;
+}
+.progress-indicator .progress-fill {
+  height: 100%;
+  background: linear-gradient(90deg, var(--primary), var(--primary2));
+  border-radius: 4px;
+  transition: width 0.3s ease;
+}
+.progress-indicator .progress-text {
+  font-size: 13px;
+  color: var(--muted);
+  text-align: center;
+}
+
 /* Download Item */
 .downloadItem {
   display: flex;

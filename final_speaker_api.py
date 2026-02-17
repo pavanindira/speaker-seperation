@@ -199,6 +199,15 @@ app = FastAPI(
     version="2.0.0"
 )
 
+# CORS Configuration - MUST be added first for proper middleware ordering
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=os.getenv("CORS_ORIGINS", "*").split(","),
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+
 from fastapi import Request, WebSocket, WebSocketDisconnect
 from fastapi.responses import JSONResponse
 from error_handler import APIError, UserFriendlyErrorFormatter
@@ -286,15 +295,6 @@ except Exception as e:
     print(f"⚠️  Templates directory not found: {e}")
     templates = None
 
-# CORS Configuration
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=os.getenv("CORS_ORIGINS", "*").split(","),
-    allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
-)
-
 # Static assets
 if _STATIC_DIR.exists():
     app.mount("/static", StaticFiles(directory=str(_STATIC_DIR)), name="static")
@@ -306,7 +306,7 @@ if _STATIC_DIR.exists():
 
 try:
     from security_improvements import (
-        verify_token, SecurityHeadersMiddleware,
+        verify_token, verify_api_key, SecurityHeadersMiddleware,
         AuditLogger, SecurityValidator, RedisRateLimiter
     )
     
@@ -509,7 +509,8 @@ def validate_file_size(file_size: int) -> bool:
 async def upload_audio(
     background_tasks: BackgroundTasks,
     request: Request,
-    file: UploadFile = File(...)
+    file: UploadFile = File(...),
+    _: bool = Depends(verify_api_key) if SECURITY_AVAILABLE else None
 ):
     """Step 1: Upload audio file with comprehensive validation"""
     
@@ -965,7 +966,7 @@ async def health():
     """Health check"""
     ollama_status = "disconnected"
     try:
-        response = requests.get(f"{config.OLLAMA_URL}/api/tags", timeout=5)
+        response = requests.get(f"{config.OLLAMA_URL}/api/tags", timeout=2)
         ollama_status = "connected" if response.status_code == 200 else "error"
     except Exception:
         pass
@@ -1162,94 +1163,6 @@ async def ui_job(request: Request, job_id: str):
             "job": jobs_db[job_id],
         },
     )
-
-
-@app.post("/api/v1/upload", response_model=JobResponse)
-@handle_errors()
-async def upload_audio(
-    background_tasks: BackgroundTasks,
-    file: UploadFile = File(...)
-):
-    """Step 1: Upload audio file with comprehensive validation"""
-    
-    with LogContext("file_upload", component="upload", job_id=None):
-        # Validate file type
-        allowed_extensions = {'.mp3', '.wav', '.flac', '.ogg', '.m4a'}
-        file_ext = Path(file.filename).suffix.lower()
-        
-        if file_ext not in allowed_extensions:
-            raise ValidationError(
-                f"Unsupported file type: {file_ext}",
-                field="filename",
-                user_message=f"File type {file_ext} not supported. Use: {', '.join(allowed_extensions)}"
-            )
-        
-        # Read and validate file size
-        file_content = await file.read()
-        file_size = len(file_content)
-        validate_file_size(file_size)
-        
-        # Validate file content is actually audio
-        try:
-            file_obj = type('obj', (object,), {'read': lambda: file_content, 'seek': lambda x: None})()
-            if not validator.is_valid_audio(file_obj):
-                raise ValidationError(
-                    "File content is not valid audio",
-                    field="file",
-                    user_message="The uploaded file does not appear to be a valid audio file"
-                )
-        except Exception as e:
-            logger.warning(
-                "Audio validation skipped due to missing validator",
-                exception=e,
-                component='upload'
-            )
-        
-        # Generate job ID and save file
-        job_id = str(uuid.uuid4())
-        upload_path = UPLOAD_DIR / f"{job_id}{file_ext}"
-        
-        try:
-            with open(upload_path, "wb") as buffer:
-                buffer.write(file_content)
-            file_content = None  # Clear memory
-        except IOError as e:
-            ErrorRecoveryHandler.handle_file_not_found(str(upload_path))
-        except OSError as e:
-            if e.errno == 28:  # No space left on device
-                ErrorRecoveryHandler.handle_disk_full()
-            raise ProcessingError("file_save", str(e))
-        
-        # Create job record
-        jobs_db[job_id] = {
-            'job_id': job_id,
-            'status': JobStatus.UPLOADED,
-            'created_at': datetime.utcnow().isoformat(),
-            'filename': file.filename,
-            'progress': 10,
-            'progress_message': 'Uploaded. Ready to diagnose.',
-            'file_path': str(upload_path),
-            'file_size': file_size,
-            'diagnostic_report': None,
-            'separated_files': None,
-            'cleaned_files': None,
-            'user_feedback': None,
-            'ollama_feedback_response': None,
-            'error': None
-        }
-        
-        logger.info(
-            "File uploaded successfully",
-            extra={
-                'job_id': job_id,
-                'filename': file.filename,
-                'file_size_mb': file_size / 1024 / 1024,
-                'file_type': file_ext
-            },
-            component='upload'
-        )
-        
-        return JobResponse(**jobs_db[job_id])
 
 
 @app.get("/api/v1/jobs/{job_id}/diagnose", response_model=JobResponse)

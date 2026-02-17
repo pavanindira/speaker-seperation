@@ -110,7 +110,7 @@ class RetryConfig:
 # ============================================================================
 
 def handle_errors(status_ok: int = 200):
-    """Decorator for error handling in async functions"""
+    """Decorator for error handling in async functions - re-raises exceptions for FastAPI handlers"""
     def decorator(func: Callable) -> Callable:
         @wraps(func)
         async def wrapper(*args, **kwargs):
@@ -127,12 +127,8 @@ def handle_errors(status_ok: int = 200):
                     },
                     component='error_handler'
                 )
-                # Return error response (caller should convert to FastAPI response)
-                return {
-                    'success': False,
-                    'error': e.user_message,
-                    'status_code': e.status_code
-                }
+                # Re-raise so FastAPI exception handlers can format the response
+                raise
             except Exception as e:
                 logger.error(
                     f"Unexpected error in {func.__name__}",
@@ -140,11 +136,8 @@ def handle_errors(status_ok: int = 200):
                     extra={'error_type': type(e).__name__},
                     component='error_handler'
                 )
-                return {
-                    'success': False,
-                    'error': 'An unexpected error occurred',
-                    'status_code': 500
-                }
+                # Re-raise so FastAPI exception handlers can format the response
+                raise
         return wrapper
     return decorator
 

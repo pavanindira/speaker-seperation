@@ -17,6 +17,16 @@ import bcrypt
 # 1. JWT TOKEN AUTHENTICATION (CRITICAL FIX: Load SECRET_KEY from environment)
 # =============================================================================
 
+# Load .env file first before checking environment variables
+try:
+    from dotenv import load_dotenv
+    from pathlib import Path
+    env_path = Path('.env')
+    if env_path.exists():
+        load_dotenv(env_path)
+except ImportError:
+    pass
+
 # Load JWT secret from environment, or generate and warn if not found
 _ENV_SECRET = os.getenv('JWT_SECRET_KEY')
 if _ENV_SECRET:
@@ -62,6 +72,36 @@ def verify_token(credentials: HTTPAuthorizationCredentials = Depends(security)):
         raise HTTPException(status_code=401, detail="Token has expired")
     except jwt.JWTError:
         raise HTTPException(status_code=401, detail="Could not validate credentials")
+
+
+# =============================================================================
+# 2. API KEY AUTHENTICATION
+# =============================================================================
+
+# Load API key from environment
+_API_KEY = os.getenv('API_KEY', '')
+_ENABLE_AUTH = os.getenv('ENABLE_AUTH', 'false').lower() == 'true'
+
+
+def verify_api_key(x_api_key: str = Header(None, alias="X-API-Key")):
+    """Verify API key from X-API-Key header"""
+    if not _ENABLE_AUTH:
+        # Authentication disabled, allow all requests
+        return True
+    
+    if not x_api_key:
+        raise HTTPException(
+            status_code=401,
+            detail="API key required. Pass X-API-Key header."
+        )
+    
+    if x_api_key != _API_KEY:
+        raise HTTPException(
+            status_code=403,
+            detail="Invalid API key"
+        )
+    
+    return True
 
 
 # =============================================================================
