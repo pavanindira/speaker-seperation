@@ -25,7 +25,7 @@ function setHidden(id, hidden) {
   el.classList.toggle("hidden", !!hidden);
 }
 
-function setAlert(message) {
+function setAlert(message, type = "error") {
   const el = $("alert");
   if (!el) return;
   if (!message) {
@@ -35,6 +35,7 @@ function setAlert(message) {
   }
   el.textContent = message;
   el.classList.remove("hidden");
+  el.className = `alert ${type}`;
 }
 
 function setStepActive(stepNum) {
@@ -42,7 +43,25 @@ function setStepActive(stepNum) {
     const el = $(`step${i}`);
     if (!el) continue;
     el.classList.toggle("active", i === stepNum);
-    el.classList.toggle("done", i < stepNum);
+    el.classList.toggle("completed", i < stepNum);
+  }
+  
+  // Update stage indicator
+  const stageIcon = $("stageIcon");
+  const stageText = $("stageText");
+  
+  const stages = {
+    1: { icon: "🔍", text: "Analyzing audio..." },
+    2: { icon: "⚙️", text: "Separating speakers..." },
+    3: { icon: "✨", text: "Cleaning audio..." },
+    4: { icon: "✅", text: "Complete!" }
+  };
+  
+  if (stageIcon && stages[stepNum]) {
+    stageIcon.textContent = stages[stepNum].icon;
+  }
+  if (stageText && stages[stepNum]) {
+    stageText.textContent = stages[stepNum].text;
   }
 }
 
@@ -56,11 +75,13 @@ function setWizardTitle(title, subtitle) {
 function setProgress(progress, message) {
   const fill = $("progressFill");
   const text = $("progressText");
+  const percent = $("progressPercent");
   const bar = document.querySelector(".progressBar");
   const p = Number.isFinite(progress) ? Math.max(0, Math.min(100, progress)) : 0;
   if (fill) fill.style.width = `${p}%`;
   if (bar) bar.setAttribute("aria-valuenow", String(p));
   if (text) text.textContent = message || "";
+  if (percent) percent.textContent = `${Math.round(p)}%`;
 }
 
 function renderDiagnosis(report) {
@@ -110,25 +131,89 @@ function renderDownloads(job) {
       const inlineHref = `/api/v1/download/${job.job_id}/${fileType}/${encodeURIComponent(filename)}?inline=1`;
       const dlHref = `/api/v1/download/${job.job_id}/${fileType}/${encodeURIComponent(filename)}`;
       return `
-        <div class="fileRow">
-          <div class="fileMeta">
-            <div class="fileName"><span class="mono">${key}</span></div>
-            <div class="fileSubtle mono">${filename}</div>
+        <div class="downloadItem">
+          <div>
+            <div class="speaker-title">${key}</div>
+            <div class="subtle mono">${filename}</div>
           </div>
-          <audio class="fileAudio" controls preload="metadata" src="${inlineHref}"></audio>
-          <a class="fileDownload" href="${dlHref}">Download</a>
+          <div style="display: flex; gap: 8px; align-items: center;">
+            <audio controls preload="metadata" src="${inlineHref}" style="height: 32px;"></audio>
+            <a href="${dlHref}" class="button primary" style="padding: 8px 16px; font-size: 14px;">📥 Download</a>
+          </div>
         </div>
       `;
     });
     if (links.length) {
-      blocks.push(`<div class="resultBlock"><div class="resultTitle">${title}</div>${links.join("")}</div>`);
+      blocks.push(`<div style="margin-bottom: 16px;"><div class="label" style="margin-bottom: 8px;">${title}</div>${links.join("")}</div>`);
     }
   };
 
-  addBlock("Separated", job.separated_files, "separated");
-  addBlock("Cleaned", job.cleaned_files, "cleaned");
+  addBlock("Separated Speakers", job.separated_files, "separated");
+  addBlock("Cleaned Audio", job.cleaned_files, "cleaned");
 
   container.innerHTML = blocks.length ? blocks.join("") : "No files yet.";
+}
+
+/**
+ * Enhanced error display function
+ * Displays errors with helpful tips and retry options
+ */
+function showError(errorResponse) {
+  const errorContainer = $("errorContainer");
+  if (!errorContainer) return;
+  
+  const error = errorResponse.error || errorResponse;
+  
+  // Build error HTML
+  const errorHTML = `
+    <div class="error-header" style="display: flex; align-items: center; gap: 12px; margin-bottom: 16px;">
+      <div style="font-size: 48px;">${error.icon || '❌'}</div>
+      <div>
+        <h3 style="margin: 0; color: var(--error);">${error.title || 'Error'}</h3>
+      </div>
+    </div>
+    
+    <div style="margin-bottom: 16px; color: var(--gray-800);">
+      ${error.message || 'An error occurred'}
+    </div>
+    
+    ${error.helpful_tips && error.helpful_tips.length > 0 ? `
+      <div style="margin-bottom: 16px;">
+        <div class="label" style="margin-bottom: 8px;">What You Can Do:</div>
+        <ul class="list">
+          ${error.helpful_tips.map(tip => `<li>${tip}</li>`).join('')}
+        </ul>
+      </div>
+    ` : ''}
+    
+    <div class="actions">
+      ${error.can_retry ? `
+        <button class="button primary" onclick="location.reload()">
+          🔄 Try Again
+        </button>
+      ` : ''}
+      <a class="button secondary" href="/ui">
+        🏠 Start Over
+      </a>
+    </div>
+    
+    ${error.error_id ? `
+      <div style="margin-top: 16px; font-size: 12px; color: #6B7280;">
+        <span class="mono">Error ID: ${error.error_id}</span>
+      </div>
+    ` : ''}
+  `;
+  
+  errorContainer.innerHTML = errorHTML;
+  errorContainer.classList.remove("hidden");
+  errorContainer.className = "error-container active error";
+  
+  // Hide other sections
+  setHidden("sectionDiagnose", true);
+  setHidden("sectionSeparate", true);
+  setHidden("sectionProcessing", true);
+  setHidden("sectionClean", true);
+  setHidden("sectionDownload", true);
 }
 
 function updateWizard(job) {
@@ -139,6 +224,13 @@ function updateWizard(job) {
   setHidden("sectionClean", true);
   setHidden("sectionDownload", true);
   setHidden("sectionFailed", true);
+  
+  // Hide error container
+  const errorContainer = $("errorContainer");
+  if (errorContainer) {
+    errorContainer.classList.add("hidden");
+    errorContainer.innerHTML = "";
+  }
 
   // Details toggle button visibility
   if ($("btnToggleDetails")) $("btnToggleDetails").disabled = false;
@@ -183,7 +275,18 @@ function updateWizard(job) {
     setStepActive(1);
     setWizardTitle("Failed", "Something went wrong. See error details.");
     setHidden("sectionFailed", false);
-    setAlert(job.error || "Unknown error");
+    
+    // Show enhanced error if available
+    if (job.error) {
+      try {
+        const errorData = typeof job.error === 'string' ? JSON.parse(job.error) : job.error;
+        showError(errorData);
+      } catch (e) {
+        setAlert(job.error || "Unknown error");
+      }
+    } else {
+      setAlert(job.error || "Unknown error");
+    }
     return;
   }
 
@@ -271,7 +374,7 @@ async function poll() {
 }
 
 async function runDiagnose() {
-  $("btnDiagnose").disabled = true;
+  if ($("btnDiagnose")) $("btnDiagnose").disabled = true;
   showLoader("Diagnosing…", "Analyzing audio and estimating speakers.");
   try {
     const res = await fetch(`/api/v1/jobs/${jobId}/diagnose`);
@@ -283,13 +386,28 @@ async function runDiagnose() {
     updateWizard(job);
     setAlert("");
     hideLoader();
+  } catch (e) {
+    showError({
+      error: {
+        icon: '🔧',
+        title: 'Diagnosis Failed',
+        message: e.message,
+        severity: 'error',
+        helpful_tips: [
+          'Check your internet connection',
+          'Make sure the server is running',
+          'Try refreshing the page and uploading again'
+        ],
+        can_retry: true
+      }
+    });
   } finally {
-    $("btnDiagnose").disabled = false;
+    if ($("btnDiagnose")) $("btnDiagnose").disabled = false;
   }
 }
 
 async function runProceed() {
-  $("btnProceed").disabled = true;
+  if ($("btnProceed")) $("btnProceed").disabled = true;
   showLoader("Starting separation…", "Uploading settings and starting background process.");
   try {
     const numSpeakers = parseInt($("numSpeakers").value || "2", 10);
@@ -307,13 +425,28 @@ async function runProceed() {
     const job = await res.json();
     updateWizard(job);
     setAlert("");
+  } catch (e) {
+    showError({
+      error: {
+        icon: '⚙️',
+        title: 'Separation Failed',
+        message: e.message,
+        severity: 'error',
+        helpful_tips: [
+          'Try reducing the number of speakers',
+          'Use a different separation method',
+          'Check if the audio file is too large'
+        ],
+        can_retry: true
+      }
+    });
   } finally {
-    $("btnProceed").disabled = false;
+    if ($("btnProceed")) $("btnProceed").disabled = false;
   }
 }
 
 async function runClean() {
-  $("btnClean").disabled = true;
+  if ($("btnClean")) $("btnClean").disabled = true;
   showLoader("Starting cleaning…", "Applying silence/noise/click removal and normalization.");
   try {
     const res = await fetch(`/api/v1/jobs/${jobId}/clean`, {
@@ -333,8 +466,22 @@ async function runClean() {
     const job = await res.json();
     updateWizard(job);
     setAlert("");
+  } catch (e) {
+    showError({
+      error: {
+        icon: '✨',
+        title: 'Cleaning Failed',
+        message: e.message,
+        severity: 'error',
+        helpful_tips: [
+          'Skip cleaning and download raw separated files',
+          'Try processing a different audio file'
+        ],
+        can_retry: true
+      }
+    });
   } finally {
-    $("btnClean").disabled = false;
+    if ($("btnClean")) $("btnClean").disabled = false;
   }
 }
 
@@ -365,4 +512,3 @@ function wire() {
 
 wire();
 poll();
-

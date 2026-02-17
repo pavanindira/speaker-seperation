@@ -4,48 +4,122 @@
 
 {% block content %}
   <section class="hero">
-    <h1>Speaker Separation</h1>
-    <p class="subtle">
-      Upload an audio file. Then run diagnosis, separation, and optional cleaning from the job page.
-    </p>
+    <h1>🎤 Speaker Separation</h1>
+    <p class="subtitle">Upload audio with multiple speakers and get individual voice tracks</p>
   </section>
 
-  <section class="card">
-    <h2>Upload</h2>
-    <form class="form" action="/ui/upload" method="post" enctype="multipart/form-data">
-      <label class="label" for="file">Audio file</label>
-      <input class="input" id="file" name="file" type="file" accept=".mp3,.wav,.flac,.ogg,.m4a,audio/*" required />
+  <!-- Upload Section -->
+  <div class="card">
+    <div class="upload-area" id="uploadArea">
+      <div class="upload-icon">📁</div>
+      <div class="upload-text">Drop your audio file here</div>
+      <div class="upload-hint">or click to browse • MP3, WAV, M4A, FLAC, OGG • Max 100MB</div>
+      <form id="uploadForm" action="/ui/upload" method="post" enctype="multipart/form-data" style="display: none;">
+        <input type="file" id="fileInput" name="file" accept=".mp3,.wav,.m4a,.flac,.ogg,audio/*" required />
+      </form>
+    </div>
+  </div>
 
-      <div class="actions">
-        <button class="button" type="submit">Upload & continue</button>
-        <a class="button secondary" href="/docs" target="_blank" rel="noopener">Open API docs</a>
+  <!-- Settings -->
+  <div class="card">
+    <h2>⚙️ Settings</h2>
+    <div class="form">
+      <div class="row">
+        <div>
+          <label class="label" for="numSpeakers">Number of Speakers</label>
+          <input class="input small" id="numSpeakers" type="number" min="2" max="10" value="2" />
+          <p class="hint">Start with 2 if unsure</p>
+        </div>
+        <div>
+          <label class="label" for="method">Method</label>
+          <select class="input" id="method">
+            <option value="gmm" selected>GMM (Recommended)</option>
+            <option value="kmeans">K-Means (Faster)</option>
+            <option value="spectral">Spectral (Advanced)</option>
+          </select>
+          <p class="hint">If unsure, keep GMM</p>
+        </div>
       </div>
+    </div>
+  </div>
 
-      <p class="hint">Supported: mp3, wav, flac, ogg, m4a. Max size is enforced server-side.</p>
-    </form>
-  </section>
+  <!-- Tips -->
+  <div class="card">
+    <h2>💡 Tips for Best Results</h2>
+    <ul class="list">
+      <li>Use high-quality recordings with minimal background noise</li>
+      <li>Works best with 30 seconds to 10 minutes of audio</li>
+      <li>If unsure about speaker count, start with 2</li>
+      <li>Keep files under 100MB for faster processing</li>
+    </ul>
+  </div>
 
-  <section class="card">
-    <h2>Recent jobs</h2>
-    {% if recent_jobs and recent_jobs|length > 0 %}
-      <div class="jobList">
-        {% for j in recent_jobs %}
-          <a class="jobItem" href="/ui/jobs/{{ j.job_id }}">
-            <div class="jobMain">
-              <div class="jobTitle">{{ j.filename }}</div>
-              <div class="jobSubtle mono">{{ j.job_id }}</div>
-            </div>
-            <div class="jobMeta">
-              <span class="pill">{{ j.status }}</span>
-              <span class="jobTime mono">{{ j.created_at }}</span>
-            </div>
-          </a>
-        {% endfor %}
-      </div>
-      <p class="hint">Jobs are stored in memory and reset when the server restarts.</p>
-    {% else %}
-      <p class="subtle">No jobs yet. Upload an audio file to get started.</p>
-    {% endif %}
-  </section>
+  <!-- Recent Jobs -->
+  {% if recent_jobs and recent_jobs|length > 0 %}
+  <div class="card">
+    <h2>Recent Jobs</h2>
+    <div class="jobList">
+      {% for j in recent_jobs %}
+        <a class="jobItem" href="/ui/jobs/{{ j.job_id }}">
+          <div class="jobMain">
+            <div class="jobTitle">{{ j.filename }}</div>
+            <div class="subtle mono">{{ j.job_id }}</div>
+          </div>
+          <div class="jobMeta">
+            <span class="pill {{ j.status }}">{{ j.status }}</span>
+            <span class="jobTime mono">{{ j.created_at }}</span>
+          </div>
+        </a>
+      {% endfor %}
+    </div>
+    <p class="hint">Jobs are stored in memory and reset when the server restarts.</p>
+  </div>
+  {% endif %}
 {% endblock %}
 
+{% block scripts %}
+<script>
+  // Upload area drag & drop
+  const uploadArea = document.getElementById('uploadArea');
+  const fileInput = document.getElementById('fileInput');
+  const uploadForm = document.getElementById('uploadForm');
+
+  uploadArea.addEventListener('click', () => {
+    fileInput.click();
+  });
+
+  uploadArea.addEventListener('dragover', (e) => {
+    e.preventDefault();
+    uploadArea.classList.add('dragging');
+  });
+
+  uploadArea.addEventListener('dragleave', () => {
+    uploadArea.classList.remove('dragging');
+  });
+
+  uploadArea.addEventListener('drop', (e) => {
+    e.preventDefault();
+    uploadArea.classList.remove('dragging');
+    
+    const files = e.dataTransfer.files;
+    if (files.length > 0) {
+      fileInput.files = files;
+      submitForm();
+    }
+  });
+
+  fileInput.addEventListener('change', () => {
+    if (fileInput.files.length > 0) {
+      submitForm();
+    }
+  });
+
+  function submitForm() {
+    // Store settings in sessionStorage for the job page
+    sessionStorage.setItem('numSpeakers', document.getElementById('numSpeakers').value);
+    sessionStorage.setItem('method', document.getElementById('method').value);
+    
+    uploadForm.submit();
+  }
+</script>
+{% endblock %}
