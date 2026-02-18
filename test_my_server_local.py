@@ -10,7 +10,7 @@ import sys
 from pathlib import Path
 import time
 
-API_BASE = "http://192.168.1.33:8900"
+API_BASE = "http://localhost:8900"
 
 class Colors:
     GREEN = '\033[92m'
@@ -207,11 +207,17 @@ def test_cors():
     """Test CORS configuration"""
     print_section("TEST 7: CORS Headers")
     try:
-        response = requests.options(f"{API_BASE}/api/v1/upload", timeout=10)
-        headers = response.headers
+        # Send proper CORS preflight request with Origin header
+        headers = {
+            'Origin': 'http://example.com',
+            'Access-Control-Request-Method': 'POST'
+        }
+        response = requests.options(f"{API_BASE}/api/v1/upload", 
+                                   headers=headers, timeout=10)
+        response_headers = response.headers
         
-        has_cors = 'access-control-allow-origin' in headers
-        origin = headers.get('access-control-allow-origin', 'Not set')
+        has_cors = 'access-control-allow-origin' in response_headers
+        origin = response_headers.get('access-control-allow-origin', 'Not set')
         
         print_test("CORS Configured", has_cors,
                   f"Allow-Origin: {origin}")
