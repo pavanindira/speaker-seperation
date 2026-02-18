@@ -915,10 +915,11 @@ async def process_separation_task(job_id: str, audio_path: Path,
         )
         _set_job_progress(job_id, 65, "Finalizing outputs…")
         
-        # Build file URLs
+        # Build file URLs - return just filenames, frontend will construct paths
         separated_files = {}
         for speaker, info in results['speakers'].items():
-            separated_files[speaker] = f"/api/v1/download/{job_id}/separated/{speaker}.wav"
+            # Just return the filename, not the full path
+            separated_files[speaker] = f"{speaker}.wav"
         
         jobs_db[job_id]['separated_files'] = separated_files
         jobs_db[job_id]['separation_results'] = results
@@ -955,10 +956,11 @@ async def process_cleaning_task(job_id: str, cleaning_config: CleaningConfig):
             )
         )
         
-        # Build file URLs
+        # Build file URLs - return just filenames, frontend will construct paths
         cleaned_files = {}
         for speaker in results.keys():
-            cleaned_files[f"{speaker}_cleaned"] = f"/api/v1/download/{job_id}/cleaned/{speaker}_cleaned.wav"
+            # Just return the filename, not the full path
+            cleaned_files[f"{speaker}_cleaned"] = f"{speaker}_cleaned.wav"
         
         jobs_db[job_id]['cleaned_files'] = cleaned_files
         jobs_db[job_id]['cleaning_results'] = results
