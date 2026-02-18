@@ -60,7 +60,7 @@
   </section>
 
   <!-- Main Content Card -->
-  <section class="card narrow centerLayout">
+  <section class="card narrow centerLayout section-wrapper">
     <h2 id="wizardTitle">Loading...</h2>
     <p class="subtle" id="wizardSubtitle">Please wait.</p>
 
@@ -174,6 +174,13 @@
       <!-- Error content inserted by JavaScript -->
     </div>
 
+    <!-- Section loader overlay -->
+    <div id="loaderOverlay" class="loaderOverlay hidden" aria-live="polite" aria-busy="true">
+      <div class="loaderSpinner" aria-hidden="true"></div>
+      <div class="loaderText" id="loaderTitle">Working...</div>
+      <div class="loaderSubtext" id="loaderSubtitle">Please wait.</div>
+    </div>
+
     <details class="details subtle leftLayout" style="margin-top: 12px;">
       <summary class="detailsSummary">Debug info</summary>
       <div class="detailsBody">
@@ -187,17 +194,6 @@
     <h2>Results</h2>
     <div id="downloads" class="downloads subtle">No files yet.</div>
   </section>
-
-  <!-- Full-page loader overlay -->
-  <div id="loaderOverlay" class="loaderOverlay hidden" aria-live="polite" aria-busy="true">
-    <div class="loaderCard">
-      <div class="spinner" aria-hidden="true"></div>
-      <div>
-        <div class="loaderTitle" id="loaderTitle">Working...</div>
-        <div class="loaderSubtitle" id="loaderSubtitle">Please wait.</div>
-      </div>
-    </div>
-  </div>
 {% endblock %}
 
 {% block scripts %}

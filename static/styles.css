@@ -413,46 +413,46 @@ h2 { margin: 0 0 12px; font-size: 18px; color: rgba(255,255,255,0.92); }
 .jobMeta { display: grid; justify-items: end; gap: 6px; }
 .jobTime { color: rgba(255,255,255,0.55); font-size: 12px; }
 
-/* Full-page loader */
+/* Section loader overlay - transparent, covers specific section */
 .loaderOverlay {
-  position: fixed;
+  position: absolute;
   inset: 0;
-  background: rgba(11, 16, 32, 0.55);
-  backdrop-filter: blur(6px);
-  display: grid;
-  place-items: center;
-  z-index: 9999;
-}
-.loaderCard {
-  width: min(520px, calc(100% - 28px));
+  background: rgba(11, 16, 32, 0.7);
+  backdrop-filter: blur(4px);
   display: flex;
-  gap: 14px;
+  flex-direction: column;
   align-items: center;
-  padding: 16px;
-  border-radius: 16px;
-  border: 1px solid rgba(255,255,255,0.14);
-  background: linear-gradient(180deg, rgba(255,255,255,0.10), rgba(255,255,255,0.06));
-  box-shadow: 0 18px 50px rgba(0,0,0,0.35);
+  justify-content: center;
+  gap: 12px;
+  z-index: 100;
+  border-radius: inherit;
 }
-.loaderTitle {
-  font-weight: 800;
-  letter-spacing: 0.2px;
-}
-.loaderSubtitle {
-  margin-top: 4px;
-  color: rgba(255,255,255,0.72);
-  font-size: 13px;
-}
-.spinner {
-  width: 30px;
-  height: 30px;
+.loaderSpinner {
+  width: 40px;
+  height: 40px;
   border-radius: 999px;
   border: 3px solid rgba(255,255,255,0.18);
-  border-top-color: rgba(124, 92, 255, 0.95);
+  border-top-color: var(--primary);
   animation: spin 0.9s linear infinite;
+}
+.loaderText {
+  color: var(--text);
+  font-weight: 600;
+  font-size: 14px;
+  text-align: center;
+}
+.loaderSubtext {
+  color: var(--muted);
+  font-size: 12px;
+  text-align: center;
 }
 @keyframes spin {
   to { transform: rotate(360deg); }
+}
+
+/* Wrapper for sections that can have loader overlay */
+.section-wrapper {
+  position: relative;
 }
 
 /* Upload Area - Drag & Drop */
