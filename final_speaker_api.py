@@ -15,6 +15,8 @@ from pathlib import Path
 from typing import Optional, List, Dict
 from datetime import datetime
 from enum import Enum
+from pathlib import Path
+import mimetypes
 
 # ============================================================================
 # CRITICAL: Import custom logging and error handling FIRST
@@ -598,6 +600,22 @@ async def upload_audio(
         
         # Generate job ID and save file
         job_id = str(uuid.uuid4())
+        # Save file
+        file_path = UPLOAD_DIR / f"{job_id}_{file.filename}"
+        with open(file_path, 'wb') as f:
+            content = await file.read()
+            f.write(content)
+        
+        # CRITICAL: Store the file path in the job!
+        jobs_db[job_id] = {
+            'job_id': job_id,
+            'status': 'uploaded',
+            'original_file': str(file_path),  # ← ADD THIS!
+            'filename': file.filename,
+            'upload_time': datetime.utcnow().isoformat()
+        }
+        
+        return {'job_id': job_id}
         upload_path = UPLOAD_DIR / f"{job_id}{file_ext}"
         
         try:
@@ -1088,10 +1106,10 @@ async def websocket_progress(websocket: WebSocket, job_id: str):
                 del active_websockets[job_id]
 
 
-@app.get("/final_speaker_frontend.html")
+@app.get("/final_speaker_frontend_improved.html")
 async def serve_frontend():
     """Legacy path: serve frontend HTML"""
-    frontend_path = Path("final_speaker_frontend.html")
+    frontend_path = Path("final_speaker_frontend_improved.html")
     if frontend_path.exists():
         return FileResponse(frontend_path, media_type="text/html")
     else:
@@ -1529,6 +1547,110 @@ async def delete_job(job_id: str):
     
     return {"message": "Job deleted successfully"}
 
+# ============================================================================
+# AUDIO FILE SERVING ENDPOINTS - Add these to fix 404 errors
+# ============================================================================
+
+@app.get("/api/v1/jobs/{job_id}/original")
+async def get_original_audio(job_id: str):
+    """Serve the original uploaded audio file for playback"""
+    
+    # Get job from database
+    if job_id not in jobs_db:
+        raise NotFoundError("Job", job_id)
+    
+    job = jobs_db[job_id]
+    
+    # Get original file path - try multiple field names
+    original_file = (
+        job.get('original_file') or 
+        job.get('upload_path') or 
+        job.get('file_path')
+    )
+    
+    if not original_file:
+        logger.error(f"No original file path for job {job_id}", component='file_serving')
+        raise HTTPException(
+            status_code=404,
+            detail="Original audio file path not found in job data"
+        )
+    
+    file_path = Path(original_file)
+    
+    # Check file exists on disk
+    if not file_path.exists():
+        logger.error(f"File not found: {file_path}", component='file_serving')
+        raise HTTPException(
+            status_code=404,
+            detail=f"Audio file no longer exists on server"
+        )
+    
+    # Detect MIME type
+    mime_type, _ = mimetypes.guess_type(str(file_path))
+    if not mime_type or not mime_type.startswith('audio'):
+        mime_type = 'audio/mpeg'  # Safe default
+    
+    logger.info(f"Serving original audio for job {job_id}", component='file_serving')
+    
+    # Serve the file
+    return FileResponse(
+        path=str(file_path),
+        media_type=mime_type,
+        filename=file_path.name,
+        headers={
+            'Accept-Ranges': 'bytes',  # Allow seeking in audio player
+            'Cache-Control': 'public, max-age=3600'
+        }
+    )
+
+
+@app.get("/api/v1/jobs/{job_id}/download/{speaker}")
+async def download_speaker_audio(job_id: str, speaker: str):
+    """Download separated speaker audio file"""
+    
+    # Get job
+    if job_id not in jobs_db:
+        raise NotFoundError("Job", job_id)
+    
+    job = jobs_db[job_id]
+    
+    # Check job has separated files
+    if 'separated_files' not in job:
+        raise HTTPException(
+            status_code=400,
+            detail="No separated files available yet. Processing may still be in progress."
+        )
+    
+    separated_files = job['separated_files']
+    
+    # Check speaker exists
+    if speaker not in separated_files:
+        available = list(separated_files.keys())
+        raise HTTPException(
+            status_code=404,
+            detail=f"Speaker '{speaker}' not found. Available speakers: {available}"
+        )
+    
+    file_path = Path(separated_files[speaker])
+    
+    if not file_path.exists():
+        raise HTTPException(
+            status_code=404,
+            detail="Separated audio file no longer exists on server"
+        )
+    
+    # Detect MIME type
+    mime_type, _ = mimetypes.guess_type(str(file_path))
+    if not mime_type:
+        mime_type = 'audio/wav'
+    
+    logger.info(f"Serving speaker {speaker} for job {job_id}", component='file_serving')
+    
+    return FileResponse(
+        path=str(file_path),
+        media_type=mime_type,
+        filename=f"{speaker}.wav"
+    )
 
 # ============================================================================
 # Main
