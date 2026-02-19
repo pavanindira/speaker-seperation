@@ -1118,6 +1118,16 @@ async def serve_frontend():
         return {"error": "Frontend not found"}
 
 
+@app.get("/frontend_compatible.html")
+async def serve_frontend():
+    """Legacy path: serve frontend HTML"""
+    frontend_path = Path("final_speaker_frontend_improved.html")
+    if frontend_path.exists():
+        return FileResponse(frontend_path, media_type="text/html")
+    else:
+        return {"error": "Frontend not found"}
+
+
 @app.get("/ui", response_class=HTMLResponse)
 async def ui_index(request: Request):
     """Jinja UI: upload page"""
